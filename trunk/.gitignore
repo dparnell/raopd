@@ -1,0 +1,12 @@
+#cscope files
+cscope.out
+cscope.files
+
+# object files
+*.o
+
+# the raopd target
+raopd
+
+# emacs backup files
+*~

@@ -1,0 +1,60 @@
+One thing that will jump out when reading the code is that goto is
+used in several places.  I do agree with many of the arguments put
+forth in "Go To Statement Considered Harmful", but I also think that
+the careful use of goto as described as follows is a great aid to
+clean implementation, so I occasionally use it in the way that Robert
+Love describes below.
+
+Having said that, if the paradigm is not followed *exactly*, the code
+instantly becomes obfuscated, so in general the use of goto is
+strongly discouraged.  In particular, if the operations to be unwound
+are not nested, goto should never be used.
+
+
+From: Robert Love
+Subject: Re: any chance of 2.6.0-test*?
+Date: 	 12 Jan 2003 17:58:06 -0500
+
+On Sun, 2003-01-12 at 17:22, Rob Wilkens wrote:
+
+> I say "please don't use goto" and instead have a "cleanup_lock" function
+> and add that before all the return statements..  It should not be a
+> burden.  Yes, it's asking the developer to work a little harder, but the
+> end result is better code.
+
+No, it is gross and it bloats the kernel.  It inlines a bunch of junk
+for N error paths, as opposed to having the exit code once at the end. 
+Cache footprint is key and you just killed it.
+
+Nor is it easier to read.
+
+As a final argument, it does not let us cleanly do the usual stack-esque
+wind and unwind, i.e.
+
+     do A
+     if (error)
+     	goto out_a;
+
+     do B
+     if (error)
+     	goto out_b;
+
+     do C
+     if (error)
+     	goto out_c;
+
+     goto out;
+
+     out_c:
+	      undo C
+     out_b:
+	      undo B:
+     out_a:
+	      undo A
+     out:
+	      return ret;
+
+Now stop this.
+
+    Robert Love
+

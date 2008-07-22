@@ -1,0 +1,51 @@
+General Style
+
+The coding style of this project is that of the Linux kernel.  A copy
+of the description of that coding style is included in this directory.
+Please adhere to it.  
+
+One area of value judgement is how descriptive should symbol names be.
+The linux kernel coding standards correctly states, "C is a Spartan
+language, and so should your naming be."  However, it is possible to
+over-subscribe to this principle.  When in doubt, make the variable
+name more descriptive.
+
+Global variables should not be used.  There is currently a very small
+set of global variables that exists for very narrowly defined
+purposes.  This set should not be expanded unless there is no
+reasonable alternative method of achieving the desired end.  If you
+feel that it is necessary to use a global variable, raise the issue
+with other developers before doing so.
+
+
+Logging
+
+All output must be sent through the logging framework.  There are no
+execptions to this rule.
+
+The logging framework was designed to be low impact so that it can be
+used in high volume code paths.  Please use log statements generously
+so that a developer or knowledgable user can turn on debugging output
+for an area of functionality and understand exactly what the server is
+doing.  Log messages that are not debug level must be written in terms
+that a non-developer can understand, and even debug level messages
+must be written in the clearest terms possible.  Remember, developers
+and users that are not familliar with the code are going to be reading
+these messages.  Output of pointer addresses in non-debug level log
+messages is likely to hurt, not help, the troubleshooting of issues by
+end users.  One method of making log messages more helpful to end
+users is the use of description fields in many of the common
+structures.  It's often helpful to include the description field in
+the log messages that refer to a struct so that the user is aware
+which structure is being discussed.  
+
+
+Valgrind (http://valgrind.org/)
+
+Valgrind is a very useful tool.  I strongly recommend running under
+valgrind during development unless you are trying do to something like
+evaluate the maximum performance of the system or do some other
+measurement where valgrind would interfere with the measurements
+you're trying to make.  If valgrind complains about your code, fix the
+problem.  
+

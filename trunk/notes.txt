@@ -1,0 +1,15 @@
+TODO
+
+Implement tracing into a buffer and make it thread safe.  If you can't
+get a buffer slot, then figure you're probably about dead anyway, and
+just log the message and a message saying there is no trace buffer
+slot.
+
+See how the kernel implements atomic_t and see if it can be used, as
+IIRC there's no atomic_t in pthreads.
+
+autoconf
+
+save & restore mask sets
+
+Use the Mozilla project NSS for encryption and encoding.
