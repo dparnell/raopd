@@ -1,0 +1,2 @@
+Implement log mask save and restore
+Review functions using goto to confirm that they require stack-unwind functionality.  If not, refactor to remove the goto
