@@ -120,6 +120,7 @@ struct rtsp_session {
 					      * The Apple Airport
 					      * Express uses 8. */
 	char url[MAX_URL_LEN];
+	short port;
 	unsigned int sequence_number;
 	struct aes_data aes_data;
 };
@@ -136,6 +137,7 @@ utility_retcode_t create_content_type_header(struct rtsp_request *request);
 utility_retcode_t create_content_length_header(struct rtsp_request *request);
 utility_retcode_t create_client_instance_header(struct rtsp_request *request);
 utility_retcode_t create_user_agent_header(struct rtsp_request *request);
+utility_retcode_t create_transport_header(struct rtsp_request *request);
 utility_retcode_t create_apple_challenge_header(struct rtsp_request *request);
 utility_retcode_t build_request_string(struct rtsp_request *request);
 utility_retcode_t allocate_response_buffer(struct rtsp_response *response);

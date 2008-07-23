@@ -234,6 +234,22 @@ utility_retcode_t create_user_agent_header(struct rtsp_request *request)
 }
 
 
+utility_retcode_t create_transport_header(struct rtsp_request *request)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	ret = add_rtsp_header(&request->headers,
+			      "Transport",
+			      "RTP/AVP/TCP;unicast;interleaved=0-1;mode=record",
+			      "Transport header");
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
 static utility_retcode_t build_request_line(struct rtsp_request *request)
 {
 	utility_retcode_t ret;
@@ -764,6 +780,7 @@ static utility_retcode_t parse_public(struct rtsp_response *response)
 
 static utility_retcode_t parse_audio_jack_status(struct rtsp_response *response)
 {
+	utility_retcode_t ret = UTILITY_SUCCESS;
 	char *value = response->current_header.value;
 
 	FUNC_ENTER;
@@ -776,11 +793,52 @@ static utility_retcode_t parse_audio_jack_status(struct rtsp_response *response)
 			AUDIO_JACK_DISCONNECTED;
 
 		ERRR("Server reports audio jack is not connected\n");
+		ret = UTILITY_FAILURE;
 	}
 
 	FUNC_RETURN;
 	return UTILITY_SUCCESS;
 }
+
+
+static utility_retcode_t parse_session(struct rtsp_response *response)
+{
+	char *value = response->current_header.value;
+
+	FUNC_ENTER;
+
+	DEBG("value: \"%s\"\n", value);
+
+	syscalls_strncpy(response->session->identifier,
+			 value,
+			 sizeof(response->session->identifier));
+
+	INFO("Session identifier: \"%s\"\n", response->session->identifier);
+
+	FUNC_RETURN;
+	return UTILITY_SUCCESS;
+}
+
+
+static utility_retcode_t parse_transport(struct rtsp_response *response)
+{
+	char *value = response->current_header.value;
+	char *port_string;
+
+	FUNC_ENTER;
+
+	DEBG("value: \"%s\"\n", value);
+
+	port_string = begin_token(value, "server_port=");
+
+	response->session->port = syscalls_strtoul(port_string, NULL, 0);
+
+	INFO("Session IP port: %d\n", response->session->port);
+
+	FUNC_RETURN;
+	return UTILITY_SUCCESS;
+}
+
 
 static utility_retcode_t parse_unknown_header(struct rtsp_response *response)
 {
@@ -834,6 +892,10 @@ static utility_retcode_t parse_one_header(struct rtsp_response *response)
 		ret = parse_apple_response(response);
 	} else if (0 == syscalls_strcmp(header_name, "Audio-Jack-Status")) {
 		ret = parse_audio_jack_status(response);
+	} else if (0 == syscalls_strcmp(header_name, "Session")) {
+		ret = parse_session(response);
+	} else if (0 == syscalls_strcmp(header_name, "Transport")) {
+		ret = parse_transport(response);
 	} else if (0 == syscalls_strcmp(header_name, "Public")) {
 		ret = parse_public(response);
 	} else {
