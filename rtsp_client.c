@@ -139,6 +139,43 @@ out:
 }
 
 
+static utility_retcode_t send_setup_request(struct rtsp_request *request)
+{
+	utility_retcode_t ret;
+
+	FUNC_ENTER;
+
+	ret = begin_request(request, "SETUP");
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+	ret = create_transport_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Transport header\n");
+		goto out;
+	}
+
+	ret = create_user_agent_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create User-Agent header\n");
+		goto out;
+	}
+
+	ret = create_client_instance_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Client-Instance header\n");
+		goto out;
+	}
+
+	ret = finish_request(request);
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
 /*
 utility_retcode_t send_options_request(struct rtsp_request *request)
 {
@@ -222,6 +259,10 @@ utility_retcode_t rtsp_start_client(void)
 	*/
 
 	send_announce_request(&request);
+	read_rtsp_response(&response);
+
+	lt_set_level(LT_RTSP, LT_DEBUG);
+	send_setup_request(&request);
 	read_rtsp_response(&response);
 
 out:
