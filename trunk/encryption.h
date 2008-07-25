@@ -51,24 +51,8 @@ struct aes_data {
 utility_retcode_t set_session_key(struct aes_data *aes_data);
 utility_retcode_t generate_aes_iv(struct aes_data *aes_data);
 utility_retcode_t generate_aes_key(struct aes_data *aes_data);
-void raop_rsa_public_key_init(struct rsa_public_key *key);
-void raop_rsa_public_key_clear(struct rsa_public_key *key);
-utility_retcode_t raop_rsa_import(char *buf, mpz_t rop, size_t *len);
-utility_retcode_t raop_rsa_export(char *buf,
-				  size_t buflen,
-				  mpz_t rop);
-utility_retcode_t verify_rsa_data(char *original_data,
-				  mpz_t rop);
-utility_retcode_t setup_rsa_key(struct rsa_data *rsa_data);
 
 #define raopd_rsa_encrypt raopd_rsa_encrypt_openssl
-
-utility_retcode_t raopd_rsa_encrypt_nettle(const struct rsa_public_key *key,
-					   const uint8_t *plaintext,
-					   const size_t plaintext_len,
-					   uint8_t **ciphertext,
-					   size_t *ciphertext_len);
-
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res);
 
 #endif /* #ifndef ENCRYPTION_H */

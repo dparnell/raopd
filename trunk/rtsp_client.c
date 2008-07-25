@@ -261,7 +261,6 @@ utility_retcode_t rtsp_start_client(void)
 	send_announce_request(&request);
 	read_rtsp_response(&response);
 
-	lt_set_level(LT_RTSP, LT_DEBUG);
 	send_setup_request(&request);
 	read_rtsp_response(&response);
 

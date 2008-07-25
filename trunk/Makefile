@@ -21,9 +21,10 @@ CC := gcc
 CFLAGS += -ggdb -Wall -Wextra -Wunused -Werror -Wshadow \
 	-Wcast-qual -Wcast-align -Wwrite-strings -Wswitch-default \
 	-Wdeclaration-after-statement -Wstrict-prototypes -Wmissing-prototypes \
-	-pedantic-errors -O2 -std=c99 -pthread -D_GNU_SOURCE -D_REENTRANT
+	-pedantic-errors -O2 -std=c99 -pthread -D_GNU_SOURCE -D_REENTRANT \
+	-I /usr/include/nss3 -I /usr/include/nspr4
 
-LINK_FLAGS += -lpthread -lgmp -lnettle -lcrypto
+LINK_FLAGS += -lpthread -lgmp -lnettle -lcrypto -lnss3
 
 .PHONY: all
 all: $(TARGETS)
