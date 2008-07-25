@@ -21,7 +21,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "utility.h"
 
-// #define USING_NSS
+#define USING_NSS
 
 #ifdef USING_NSS
 
@@ -46,6 +46,18 @@ utility_retcode_t raopd_base64_decode_nettle(uint8_t *dst,
 					     char *src,
 					     size_t srclen,
 					     size_t *decoded_length);
+
+utility_retcode_t raopd_base64_encode_nss(char *dst,
+					  size_t dstlen,
+					  uint8_t *src,
+					  size_t srclen,
+					  size_t *encoded_length);
+
+utility_retcode_t raopd_base64_decode_nss(uint8_t *dst,
+					  size_t dstlen,
+					  const char *src,
+					  const size_t srclen,
+					  size_t *decoded_length);
 
 void remove_base64_padding(char *encoded_string);
 
