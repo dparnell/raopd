@@ -24,6 +24,10 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <openssl/engine.h>
 #include <openssl/bn.h>
 
+#include <secitem.h>
+#include <secasn1.h>
+#include <keyhi.h>
+
 #include "lt.h"
 #include "utility.h"
 #include "syscalls.h"
@@ -102,4 +106,89 @@ int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res)
 	RSA_free(rsa);
 
 	return size;
+}
+
+
+/* XXX Need error checking */
+static utility_retcode_t decode_rsa_key(struct rsa_data *rsa_data)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	rsa_data->decoded_key.modulus.data =
+		syscalls_malloc(RAOP_RSA_PUB_MODULUS_LEN);
+
+	raopd_base64_decode_nss(rsa_data->decoded_key.modulus.data,
+				RAOP_RSA_PUB_MODULUS_LEN,
+				rsa_data->encoded_key.modulo,
+				syscalls_strlen(rsa_data->encoded_key.modulo),
+				&rsa_data->decoded_key.modulus.len);
+
+	rsa_data->decoded_key.modulus.type = siUnsignedInteger;
+
+	rsa_data->decoded_key.exponent.data =
+		syscalls_malloc(RAOP_RSA_PUB_EXPONENT_LEN);
+
+	raopd_base64_decode_nss(rsa_data->decoded_key.exponent.data,
+				RAOP_RSA_PUB_EXPONENT_LEN,
+				rsa_data->encoded_key.modulo,
+				syscalls_strlen(rsa_data->encoded_key.exponent),
+				&rsa_data->decoded_key.exponent.len);
+
+	rsa_data->decoded_key.exponent.type = siUnsignedInteger;
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
+/* See the NSS technical note at:
+ * http://www.mozilla.org/projects/security/pki/nss/tech-notes/tn7.html
+ */
+/* XXX Need error checking */
+utility_retcode_t setup_rsa_key(struct rsa_data *rsa_data)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	const SEC_ASN1Template ASN1_public_key_template[] = {
+		{ SEC_ASN1_SEQUENCE,
+		  0,
+		  NULL,
+		  sizeof(struct rsa_public_key_data), },
+
+		{ SEC_ASN1_INTEGER,
+		  offsetof(struct rsa_public_key_data, modulus),
+		  NULL,
+		  0, },
+
+		{ SEC_ASN1_INTEGER,
+		  offsetof(struct rsa_public_key_data, exponent),
+		  NULL,
+		  0, },
+
+		{ 0, 0, NULL, 0, }
+	};
+
+	FUNC_ENTER;
+
+	DEBG("Attempting to decode RSA key\n");
+
+	decode_rsa_key(rsa_data);
+
+	DEBG("Attempting to create ASN.1 DER encoded RSA key\n");
+
+	SEC_ASN1EncodeItem(NULL,
+			   &rsa_data->der_encoded_pub_key,
+			   &rsa_data->decoded_key,
+			   ASN1_public_key_template);
+
+	DEBG("Attempting to import ASN.1 encoded RSA key\n");
+
+	rsa_data->key =
+		SECKEY_ImportDERPublicKey(&rsa_data->der_encoded_pub_key,
+					  CKK_RSA);
+
+	FUNC_RETURN;
+	return ret;
 }
