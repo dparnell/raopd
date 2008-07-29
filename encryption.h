@@ -19,6 +19,9 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
+#include <secitem.h>
+#include <keyhi.h>
+
 #include <nettle/aes.h>
 #include <nettle/rsa.h>
 #include <nettle/cbc.h>
@@ -26,20 +29,27 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "utility.h"
 #include "rtsp.h"
 
-#define RAOP_AES_BLOCK_SIZE	64
-#define RAOP_AES_IV_LEN		16
-#define RAOP_AES_KEY_LEN	16
+#define RAOP_AES_BLOCK_SIZE		64
+#define RAOP_AES_IV_LEN			16
+#define RAOP_AES_KEY_LEN		16
+#define RAOP_RSA_PUB_MODULUS_LEN	2048
+#define RAOP_RSA_PUB_EXPONENT_LEN	16
 
 struct encoded_rsa_public_key {
 	char *modulo;
 	char *exponent;
 };
 
+struct rsa_public_key_data {
+	SECItem modulus;
+	SECItem exponent;
+};
+
 struct rsa_data {
 	struct encoded_rsa_public_key encoded_key;
-	struct rsa_public_key key;
-	size_t modulo_len;
-	size_t exponent_len;
+	struct rsa_public_key_data decoded_key;
+	SECItem der_encoded_pub_key;
+	SECKEYPublicKey *key;
 };
 
 struct aes_data {
@@ -51,6 +61,8 @@ struct aes_data {
 utility_retcode_t set_session_key(struct aes_data *aes_data);
 utility_retcode_t generate_aes_iv(struct aes_data *aes_data);
 utility_retcode_t generate_aes_key(struct aes_data *aes_data);
+
+utility_retcode_t setup_rsa_key(struct rsa_data *rsa_data);
 
 #define raopd_rsa_encrypt raopd_rsa_encrypt_openssl
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res);

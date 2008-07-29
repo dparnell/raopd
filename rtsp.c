@@ -492,12 +492,10 @@ utility_retcode_t init_rtsp_server(struct rtsp_server *server)
 		goto out;
 	}
 
-/*
 	ret = setup_rsa_key(&server->rsa_data);
 	if (UTILITY_FAILURE == ret) {
 		goto out;
 	}
-*/
 
 out:
 	FUNC_RETURN;
