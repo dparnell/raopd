@@ -34,6 +34,7 @@ int main(void)
 
 	lt_set_level(LT_MAIN, LT_INFO);
 	lt_set_level(LT_CLIENT, LT_NOTICE);
+	lt_set_level(LT_NSS_SUPPORT, LT_DEBUG);
 
 	NOTC("raopd starting\n");
 

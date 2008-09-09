@@ -51,29 +51,10 @@ static utility_retcode_t add_aes_attributes(struct rtsp_request *request,
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
 	char *base64_outbuf;
-	uint8_t *aes_key;
-	uint8_t encrypted_key[256];
-	size_t encrypted_key_len;
 	size_t encoded_len;
+	struct aes_data *aes_data = &request->session->aes_data;
 
 	FUNC_ENTER;
-
-	aes_key = (uint8_t *)&request->session->aes_data.key;
-	/*
-	ret = raopd_rsa_encrypt(&request->session->server->rsa_data.key,
-				(const uint8_t *)aes_key,
-				RAOP_AES_KEY_LEN,
-				&encrypted_key,
-				&encrypted_key_len);
-	*/
-
-	encrypted_key_len = raopd_rsa_encrypt_openssl((uint8_t *)aes_key,
-						      RAOP_AES_KEY_LEN,
-						      encrypted_key);
-
-	if (UTILITY_FAILURE == ret) {
-		goto out;
-	}
 
 	base64_outbuf = syscalls_malloc(MAX_HEADER_VALUE_LEN);
 	if (NULL == base64_outbuf) {
@@ -83,8 +64,8 @@ static utility_retcode_t add_aes_attributes(struct rtsp_request *request,
 
 	raopd_base64_encode(base64_outbuf,
 			    MAX_HEADER_VALUE_LEN,
-			    encrypted_key,
-			    encrypted_key_len,
+			    aes_data->wrapped_key.data,
+			    aes_data->wrapped_key.len,
 			    &encoded_len);
 
 	remove_base64_padding(base64_outbuf);
@@ -97,14 +78,14 @@ static utility_retcode_t add_aes_attributes(struct rtsp_request *request,
 			    "attributes rsaaeskey");
 
 	if (UTILITY_SUCCESS != ret) {
-		ERRR("Could not add SDP field \"attributes aesiv\"\n");
+		ERRR("Could not add SDP field \"attributes rsaaeskey\"\n");
 		goto free_base64_outbuf;
 	}
 
 	raopd_base64_encode(base64_outbuf,
 			    MAX_HEADER_VALUE_LEN,
-			    request->session->aes_data.iv,
-			    sizeof(request->session->aes_data.iv),
+			    aes_data->nss_iv.data,
+			    aes_data->nss_iv.len,
 			    &encoded_len);
 
 	remove_base64_padding(base64_outbuf);

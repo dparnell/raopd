@@ -11,7 +11,7 @@ RAOPD_OBJS += config.o
 RAOPD_OBJS += rtsp.o
 RAOPD_OBJS += rtsp_client.o
 RAOPD_OBJS += sdp.o
-#RAOPD_OBJS += raop_play_base64.o
+RAOPD_OBJS += nss_support.o
 
 RAOPD_HEADERS += *.h
 
@@ -20,7 +20,7 @@ CC := gcc
 # Should enable -Wconversion with gcc4.3
 CFLAGS += -ggdb -Wall -Wextra -Wunused -Werror -Wshadow \
 	-Wcast-qual -Wcast-align -Wwrite-strings -Wswitch-default \
-	-Wdeclaration-after-statement -Wstrict-prototypes -Wmissing-prototypes \
+	-Wdeclaration-after-statement -Wmissing-prototypes \
 	-pedantic-errors -O2 -std=c99 -pthread -D_GNU_SOURCE -D_REENTRANT \
 	-I /usr/include/nss3 -I /usr/include/nspr4
 

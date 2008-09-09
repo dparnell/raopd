@@ -145,7 +145,7 @@ utility_retcode_t read_response(struct rtsp_response *response)
 		     response->buf);
 		ret = UTILITY_SUCCESS;
 	} else {
-		ERRR("Failed to read response from server \"%s\"\n",
+		ERRR("Read from server \"%s\" failed\n",
 		     session->server->name);
 		ret = UTILITY_FAILURE;
 	}

@@ -24,6 +24,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "rtsp.h"
 #include "rtsp_client.h"
 #include "sdp.h"
+#include "nss_support.h"
 
 #define DEFAULT_FACILITY LT_RTSP_CLIENT
 
@@ -208,7 +209,8 @@ static utility_retcode_t read_rtsp_response(struct rtsp_response *response)
 
 	ret = read_response(response);
 	if (UTILITY_SUCCESS != ret) {
-		ERRR("Failed to read response to options request.\n");
+		ERRR("Failed to read response from server \"%s\"\n",
+			response->session->server->name);
 	} else {
 		ret = rtsp_parse_response(response);
 	}
@@ -230,6 +232,12 @@ utility_retcode_t rtsp_start_client(void)
 	FUNC_ENTER;
 
 	INFO("Starting RTSP client\n");
+
+	if (UTILITY_SUCCESS != init_nss()) {
+		ERRR("Could not initialize Network Security Services\n");
+		ret = UTILITY_FAILURE;
+		goto out;
+	}
 
 	init_rtsp_client(&client);
 	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
@@ -258,11 +266,34 @@ utility_retcode_t rtsp_start_client(void)
 	read_rtsp_response(&response);
 	*/
 
-	send_announce_request(&request);
-	read_rtsp_response(&response);
+	ret = send_announce_request(&request);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to send ANNOUNCE request to server \"%s\"\n",
+		     server.name);
+		goto out;
+	}
 
-	send_setup_request(&request);
-	read_rtsp_response(&response);
+	ret = read_rtsp_response(&response);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to read ANNOUNCE response from server \"%s\"\n",
+		     server.name);
+		goto out;
+	}
+
+	ret = send_setup_request(&request);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to send SETUP request to server \"%s\"\n",
+		     server.name);
+		goto out;
+	}
+
+	ret = read_rtsp_response(&response);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to read SETUP response from server \"%s\"\n",
+		     server.name);
+		goto out;
+	}
+
 
 out:
 	FUNC_RETURN;

@@ -19,12 +19,9 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
-#include <secitem.h>
+#include <nss.h>
+#include <pk11func.h>
 #include <keyhi.h>
-
-#include <nettle/aes.h>
-#include <nettle/rsa.h>
-#include <nettle/cbc.h>
 
 #include "utility.h"
 #include "rtsp.h"
@@ -55,14 +52,25 @@ struct rsa_data {
 struct aes_data {
 	uint8_t iv[RAOP_AES_IV_LEN];
 	uint8_t key[RAOP_AES_KEY_LEN];
-	struct CBC_CTX(struct aes_ctx, AES_BLOCK_SIZE) aes;
+
+	/* NSS below here, nss_ should be removed when nettle removed */
+	/* We use the same (internal) slot for all NSS operations */
+	PK11SlotInfo *slot;
+	SECItem nss_iv;
+	SECItem *sec_param;
+	PK11SymKey *unwrapped_key;
+	SECItem wrapped_key;
 };
 
 utility_retcode_t set_session_key(struct aes_data *aes_data);
 utility_retcode_t generate_aes_iv(struct aes_data *aes_data);
 utility_retcode_t generate_aes_key(struct aes_data *aes_data);
+utility_retcode_t generate_aes_iv_nss(struct aes_data *aes_data);
+utility_retcode_t generate_aes_key_nss(struct aes_data *aes_data);
 
 utility_retcode_t setup_rsa_key(struct rsa_data *rsa_data);
+utility_retcode_t wrap_aes_key(struct aes_data *aes_data,
+			       struct rsa_data *rsa_data);
 
 #define raopd_rsa_encrypt raopd_rsa_encrypt_openssl
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res);
