@@ -13,3 +13,34 @@ autoconf
 save & restore mask sets
 
 Use the Mozilla project NSS for encryption and encoding.
+
+(gdb) bt
+#0  rsa_FormatOneBlock (modulusLen=256, blockType=RSA_BlockPublic,
+data=0xbf956d94)
+    at rsawrapr.c:199
+#1  0x00383cd2 in rsa_FormatBlock (result=0xbf956da0, modulusLen=256,
+blockType=RSA_BlockPublic, 
+    data=0xbf956d94) at rsawrapr.c:423
+#2  0x0038428d in RSA_EncryptBlock (key=0x83a7730, output=0x83a6428
+"", output_len=0xbf956e08, 
+    max_output_len=256, input=0x83a5580 "�N�r%�t0�P\030\222\204",
+    input_len=16) at rsawrapr.c:646
+#3  0x0037582e in NSC_Encrypt (hSession=16777219, pData=0x83a5580
+"�N�r%�t0�P\030\222\204", 
+    ulDataLen=16, pEncryptedData=0x83a6428 "",
+    pulEncryptedDataLen=0xbf956ef8) at pkcs11c.c:946
+#4  0x0037c460 in NSC_WrapKey (hSession=16777219,
+pMechanism=0xbf956eec, hWrappingKey=2, hKey=1, 
+    pWrappedKey=0x83a6428 "", pulWrappedKeyLen=0xbf956ef8) at
+    pkcs11c.c:4252
+#5  0x00191be5 in PK11_PubWrapSymKey (type=9, pubKey=0x83a51f0,
+symKey=0x83a52d0, 
+    wrappedKey=0xbf957188) at pk11skey.c:1173
+#6  0x0804d24a in wrap_aes_key (aes_data=0xbf95704c,
+rsa_data=0xbf957374) at encryption.c:181
+#7  0x080510e3 in init_rtsp_session (session=0xbf956fe8,
+client=0xbf9573a8, server=0xbf9572f0)
+    at rtsp.c:542
+#8  0x08052524 in rtsp_start_client () at rtsp_client.c:252
+#9  0x0804944f in main () at main.c:41
+(gdb)

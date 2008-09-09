@@ -621,7 +621,7 @@ char *begin_token(const char *s, const char *delim)
 
 	FUNC_ENTER;
 
-	/* DEBG("string: \"%s\" delim: \"%s\"\n", s, delim); */
+	DEBG("string: \"%s\" delim: \"%s\"\n", s, delim);
 
 	begin = syscalls_strstr(s, delim);
 	if (NULL != begin) {

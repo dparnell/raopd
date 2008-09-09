@@ -529,17 +529,17 @@ utility_retcode_t init_rtsp_session(struct rtsp_session *session,
 	syscalls_snprintf(session->url, MAX_URL_LEN, "rtsp://%s/%s",
 			  client->host, session->identifier);
 
-	ret = generate_aes_iv(&session->aes_data);
+	ret = generate_aes_iv_nss(&session->aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	ret = generate_aes_key(&session->aes_data);
+	ret = generate_aes_key_nss(&session->aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	ret = set_session_key(&session->aes_data);
+	ret = wrap_aes_key(&session->aes_data, &session->server->rsa_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
