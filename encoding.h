@@ -21,43 +21,17 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "utility.h"
 
-#define USING_NSS
+utility_retcode_t raopd_base64_encode(char *dst,
+				      size_t dstlen,
+				      const uint8_t *src,
+				      size_t srclen,
+				      size_t *encoded_length);
 
-#ifdef USING_NSS
-
-#define raopd_base64_encode raopd_base64_encode_nss
-#define raopd_base64_decode raopd_base64_decode_nss
-
-#else /* #ifdef USING_NSS */
-
-#define raopd_base64_encode raopd_base64_encode_nettle
-#define raopd_base64_decode raopd_base64_decode_nettle
-
-#endif /* #ifdef USING_NSS */
-
-utility_retcode_t raopd_base64_encode_nettle(char *dst,
-					     size_t dstlen,
-					     uint8_t *src,
-					     size_t srclen,
-					     size_t *encoded_length);
-
-utility_retcode_t raopd_base64_decode_nettle(uint8_t *dst,
-					     size_t dstlen,
-					     char *src,
-					     size_t srclen,
-					     size_t *decoded_length);
-
-utility_retcode_t raopd_base64_encode_nss(char *dst,
-					  size_t dstlen,
-					  uint8_t *src,
-					  size_t srclen,
-					  size_t *encoded_length);
-
-utility_retcode_t raopd_base64_decode_nss(uint8_t *dst,
-					  size_t dstlen,
-					  const char *src,
-					  const size_t srclen,
-					  size_t *decoded_length);
+utility_retcode_t raopd_base64_decode(uint8_t *dst,
+				      size_t dstlen,
+				      const char *src,
+				      const size_t srclen,
+				      size_t *decoded_length);
 
 void remove_base64_padding(char *encoded_string);
 

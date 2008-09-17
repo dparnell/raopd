@@ -492,11 +492,6 @@ utility_retcode_t init_rtsp_server(struct rtsp_server *server)
 		goto out;
 	}
 
-	ret = setup_rsa_key(&server->rsa_data);
-	if (UTILITY_FAILURE == ret) {
-		goto out;
-	}
-
 out:
 	FUNC_RETURN;
 	return ret;
@@ -509,6 +504,7 @@ utility_retcode_t init_rtsp_session(struct rtsp_session *session,
 {
 	utility_retcode_t ret;
 	uint8_t buf[4];
+	struct aes_data *aes_data = &session->aes_data;
 
 	FUNC_ENTER;
 	syscalls_memset(session, 0, sizeof(*session));
@@ -529,20 +525,21 @@ utility_retcode_t init_rtsp_session(struct rtsp_session *session,
 	syscalls_snprintf(session->url, MAX_URL_LEN, "rtsp://%s/%s",
 			  client->host, session->identifier);
 
-	ret = generate_aes_iv_nss(&session->aes_data);
+	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
+
+	ret = generate_aes_iv(aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	ret = generate_aes_key_nss(&session->aes_data);
+	ret = generate_aes_key(aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	ret = wrap_aes_key(&session->aes_data, &session->server->rsa_data);
-	if (UTILITY_SUCCESS != ret) {
-		goto out;
-	}
+	raopd_rsa_encrypt_openssl(aes_data->key,
+				  RAOP_AES_KEY_LEN,
+				  aes_data->rsa_encrypted_key);
 
 out:
 	FUNC_RETURN;

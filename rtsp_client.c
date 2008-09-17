@@ -24,7 +24,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "rtsp.h"
 #include "rtsp_client.h"
 #include "sdp.h"
-#include "nss_support.h"
 
 #define DEFAULT_FACILITY LT_RTSP_CLIENT
 
@@ -233,15 +232,8 @@ utility_retcode_t rtsp_start_client(void)
 
 	INFO("Starting RTSP client\n");
 
-	if (UTILITY_SUCCESS != init_nss()) {
-		ERRR("Could not initialize Network Security Services\n");
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
 	init_rtsp_client(&client);
 	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
-	lt_set_level(LT_ENCODING, LT_DEBUG);
 
 	ret = init_rtsp_server(&server);
 	if (UTILITY_FAILURE == ret) {

@@ -22,7 +22,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "utility.h"
 #include "rtsp.h"
 
-//#define HTTPD_TEST
+// #define HTTPD_TEST
 
 #ifndef HTTPD_TEST
 

@@ -84,7 +84,6 @@ typedef enum {
 	LT_SDP_POSITION,
 	LT_ENCODING_POSITION,
 	LT_ENCRYPTION_POSITION,
-	LT_NSS_SUPPORT_POSITION
 } lt_facility_position_t;
 
 typedef uint64_t lt_mask_t;
@@ -101,7 +100,6 @@ typedef uint64_t lt_mask_t;
 #define LT_SDP			(((lt_mask_t)0x1) << LT_SDP_POSITION)
 #define LT_ENCODING		(((lt_mask_t)0x1) << LT_ENCODING_POSITION)
 #define LT_ENCRYPTION		(((lt_mask_t)0x1) << LT_ENCRYPTION_POSITION)
-#define LT_NSS_SUPPORT		(((lt_mask_t)0x1) << LT_NSS_SUPPORT_POSITION)
 
 #define LT_DEFAULT_MASK		(((lt_mask_t)(~0)) ^ LT_FUNCTION_CALLS)
 #define LT_DEFAULT_LEVEL	LT_WARNING
