@@ -83,6 +83,7 @@ int syscalls_pthread_join(pthread_t thread, void **value_ptr);
 #define syscalls_strncat strncat
 #define syscalls_strtoul strtoul
 #define syscalls_strchr strchr
+#define syscalls_strrchr strrchr
 #define syscalls_strstr strstr
 #define syscalls_index index
 #define syscalls_getpid getpid

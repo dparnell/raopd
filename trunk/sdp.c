@@ -64,8 +64,8 @@ static utility_retcode_t add_aes_attributes(struct rtsp_request *request,
 
 	raopd_base64_encode(base64_outbuf,
 			    MAX_HEADER_VALUE_LEN,
-			    aes_data->wrapped_key.data,
-			    aes_data->wrapped_key.len,
+			    aes_data->rsa_encrypted_key,
+			    RAOP_RSA_PUB_MODULUS_LEN,
 			    &encoded_len);
 
 	remove_base64_padding(base64_outbuf);
@@ -84,8 +84,8 @@ static utility_retcode_t add_aes_attributes(struct rtsp_request *request,
 
 	raopd_base64_encode(base64_outbuf,
 			    MAX_HEADER_VALUE_LEN,
-			    aes_data->nss_iv.data,
-			    aes_data->nss_iv.len,
+			    aes_data->iv,
+			    RAOP_AES_IV_LEN,
 			    &encoded_len);
 
 	remove_base64_padding(base64_outbuf);

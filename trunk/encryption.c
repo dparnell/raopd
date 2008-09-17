@@ -23,9 +23,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <openssl/engine.h>
 #include <openssl/bn.h>
 
-#include <nss.h>
-#include <pk11func.h>
-
 #include "lt.h"
 #include "utility.h"
 #include "syscalls.h"
@@ -66,123 +63,6 @@ utility_retcode_t generate_aes_key(struct aes_data *aes_data)
 }
 
 
-utility_retcode_t generate_aes_iv_nss(struct aes_data *aes_data)
-{
-	utility_retcode_t ret = UTILITY_SUCCESS;
-
-	FUNC_ENTER;
-
-	DEBG("Generating a %d byte initialization vector\n", RAOP_AES_IV_LEN);
-
-	aes_data->nss_iv.data = syscalls_malloc(RAOP_AES_IV_LEN);
-	if (NULL == aes_data->nss_iv.data) {
-		ERRR("Failed to allocate %d bytes for AES IV\n",
-		     RAOP_AES_IV_LEN);
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
-	ret = get_random_bytes(aes_data->nss_iv.data, RAOP_AES_IV_LEN);
-	if (UTILITY_SUCCESS != ret) {
-		goto out;
-	}
-
-	aes_data->nss_iv.len = RAOP_AES_IV_LEN;
-
-	DEBG("Setting up PKCS11 parameter from AES IV\n");
-
-	aes_data->sec_param = PK11_ParamFromIV(CKM_AES_CBC_PAD, &aes_data->nss_iv);
-	if (NULL == aes_data->sec_param) {
-		ERRR("Failed to set up PKCS11 parameter\n");
-		goto out;
-	}
-
-out:
-	FUNC_RETURN;
-	return ret;
-}
-
-
-utility_retcode_t generate_aes_key_nss(struct aes_data *aes_data)
-{
-	utility_retcode_t ret = UTILITY_SUCCESS;
-
-	FUNC_ENTER;
-
-	DEBG("Generating a %d byte AES key using NSS\n", RAOP_AES_KEY_LEN);
-
-	aes_data->slot = PK11_GetInternalKeySlot();
-	if (NULL == aes_data->slot) {
-		ret = UTILITY_FAILURE;
-		goto done;
-	}
-
-	aes_data->unwrapped_key = PK11_KeyGen(aes_data->slot,
-					      CKM_AES_KEY_GEN,
-					      0,
-					      RAOP_AES_KEY_LEN,
-					      0);
-
-	if (NULL == aes_data->unwrapped_key) {
-		ret = UTILITY_FAILURE;
-	}
-
-done:
-	FUNC_RETURN;
-	return ret;
-}
-
-utility_retcode_t wrap_aes_key(struct aes_data *aes_data,
-			       struct rsa_data *rsa_data)
-{
-	utility_retcode_t ret = UTILITY_SUCCESS;
-	SECStatus status;
-
-	FUNC_ENTER;
-
-	DEBG("Wrapping (encrypting) AES key\n");
-
-	aes_data->wrapped_key.len = SECKEY_PublicKeyStrength(rsa_data->key);
-
-	INFO("Wrapped key length: %d\n", aes_data->wrapped_key.len);
-
-	aes_data->wrapped_key.data = syscalls_malloc(aes_data->wrapped_key.len);
-	if (NULL == aes_data->wrapped_key.data) {
-
-		ERRR("Failed to allocate %d bytes for encrypted key\n",
-		     aes_data->wrapped_key.len);
-		ret = UTILITY_FAILURE;
-		goto out;
-
-	}
-
-	/* From the openssl manpage:
-
-	   RSA_PKCS1_OAEP_PADDING
-           EME-OAEP as defined in PKCS #1 v2.0 with SHA-1, MGF1 and an empty encoding
-           parameter. This mode is recommended for all new applications.
-
-	   This is *NOT* what I've done in the call to PK11_PubWrapSymKey.
-	*/
-	status = PK11_PubWrapSymKey(CKM_RSA_PKCS_OAEP, // CKM_RSA_X_509
-				    rsa_data->key,
-				    aes_data->unwrapped_key,
-				    &aes_data->wrapped_key);
-
-	if (status != SECSuccess) {
-		ERRR("Failed to wrap AES key\n");
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
-	DEBG("Wrapped AES key successfully\n");
-
-out:
-	FUNC_RETURN;
-	return ret;
-}
-
-
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res)
 {
 	RSA *rsa;
@@ -190,13 +70,14 @@ int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res)
 	uint8_t exponent[24];
 	size_t size;
 
-        char n[] =
+        char n[] = 
             "59dE8qLieItsH1WgjrcFRKj6eUWqi+bGLOX1HL3U3GhC/j0Qg90u3sG/1CUtwC"
             "5vOYvfDmFI6oSFXi5ELabWJmT2dKHzBJKa3k9ok+8t9ucRqMd6DZHJ2YCCLlDR"
             "KSKv6kDqnw4UwPdpOMXziC/AMj3Z/lUVX1G7WSHCAWKf1zNS1eLvqr+boEjXuB"
             "OitnZ/bDzPHrTOZz0Dew0uowxf/+sG+NCK3eQJVxqcaJ/vEHKIVd2M+5qL71yJ"
             "Q+87X6oV3eaYvt3zWZYD6z5vYTcrtij2VZ9Zmni/UAaHqn9JdsBWLUEpVviYnh"
             "imNVvYFZeCXg/IdTQ+x4IRdiXNv5hEew==";
+
         char e[] = "AQAB";
 
 	rsa = RSA_new();
@@ -207,90 +88,8 @@ int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res)
 	size = RSA_public_encrypt(len, text, res, rsa, RSA_PKCS1_OAEP_PADDING);
 	RSA_free(rsa);
 
+	DEBG("RSA encrypted result (%d bytes)\n", size);
+
 	return size;
 }
 
-
-/* XXX Need error checking */
-static utility_retcode_t decode_rsa_key(struct rsa_data *rsa_data)
-{
-	utility_retcode_t ret = UTILITY_SUCCESS;
-
-	FUNC_ENTER;
-
-	rsa_data->decoded_key.modulus.data =
-		syscalls_malloc(RAOP_RSA_PUB_MODULUS_LEN);
-
-	raopd_base64_decode_nss(rsa_data->decoded_key.modulus.data,
-				RAOP_RSA_PUB_MODULUS_LEN,
-				rsa_data->encoded_key.modulo,
-				syscalls_strlen(rsa_data->encoded_key.modulo),
-				&rsa_data->decoded_key.modulus.len);
-
-	rsa_data->decoded_key.modulus.type = siUnsignedInteger;
-
-	rsa_data->decoded_key.exponent.data =
-		syscalls_malloc(RAOP_RSA_PUB_EXPONENT_LEN);
-
-	raopd_base64_decode_nss(rsa_data->decoded_key.exponent.data,
-				RAOP_RSA_PUB_EXPONENT_LEN,
-				rsa_data->encoded_key.modulo,
-				syscalls_strlen(rsa_data->encoded_key.exponent),
-				&rsa_data->decoded_key.exponent.len);
-
-	rsa_data->decoded_key.exponent.type = siUnsignedInteger;
-
-	FUNC_RETURN;
-	return ret;
-}
-
-
-/* See the NSS technical note at:
- * http://www.mozilla.org/projects/security/pki/nss/tech-notes/tn7.html
- */
-/* XXX Need error checking */
-utility_retcode_t setup_rsa_key(struct rsa_data *rsa_data)
-{
-	utility_retcode_t ret = UTILITY_SUCCESS;
-
-	const SEC_ASN1Template ASN1_public_key_template[] = {
-		{ SEC_ASN1_SEQUENCE,
-		  0,
-		  NULL,
-		  sizeof(struct rsa_public_key_data), },
-
-		{ SEC_ASN1_INTEGER,
-		  offsetof(struct rsa_public_key_data, modulus),
-		  NULL,
-		  0, },
-
-		{ SEC_ASN1_INTEGER,
-		  offsetof(struct rsa_public_key_data, exponent),
-		  NULL,
-		  0, },
-
-		{ 0, 0, NULL, 0, }
-	};
-
-	FUNC_ENTER;
-
-	DEBG("Attempting to decode RSA key\n");
-
-	decode_rsa_key(rsa_data);
-
-	DEBG("Attempting to create ASN.1 DER encoded RSA key\n");
-
-	SEC_ASN1EncodeItem(NULL,
-			   &rsa_data->der_encoded_pub_key,
-			   &rsa_data->decoded_key,
-			   ASN1_public_key_template);
-
-	DEBG("Attempting to import ASN.1 encoded RSA key\n");
-
-	rsa_data->key =
-		SECKEY_ImportDERPublicKey(&rsa_data->der_encoded_pub_key,
-					  CKK_RSA);
-
-	FUNC_RETURN;
-	return ret;
-}
