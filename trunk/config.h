@@ -38,7 +38,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #endif /* #ifndef HTTPD_TEST */
 
-utility_retcode_t get_content_type(char *type, size_t size);
 utility_retcode_t get_client(struct rtsp_client *client);
 utility_retcode_t get_server(struct rtsp_server *server);
 utility_retcode_t get_user_agent(struct rtsp_client *client);

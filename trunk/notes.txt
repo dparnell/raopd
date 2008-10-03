@@ -1,3 +1,27 @@
+./faac -P -X ../../audio_samples/sndtest.raw
+
+I believe the audio data is stored as integers.
+
+The PCM parameters for the raw audio are as follows:
+
+[dallan@merry audio_samples]$ play -L -s -2 -c2 -r 44100 -v .5
+sndtest.raw
+
+Input File     : 'sndtest.raw'
+Sample Size    : 16-bit (2 bytes)
+Sample Encoding: signed (2's complement)
+Channels       : 2
+Sample Rate    : 44100
+Level adjust   : 0.5 (linear gain)
+
+Time: 00:13.75 [00:00.00] of 00:00.00 (  0.0%) Output Buffer: 606.21K
+
+Done.
+[dallan@merry audio_samples]$ 
+
+
+
+
 TODO
 
 Implement tracing into a buffer and make it thread safe.  If you can't

@@ -133,14 +133,12 @@ utility_retcode_t create_cseq_header(struct rtsp_request *request)
 }
 
 
-utility_retcode_t create_content_type_header(struct rtsp_request *request)
+utility_retcode_t create_content_type_header(struct rtsp_request *request,
+					     const char *type)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
-	char type[32];
 
 	FUNC_ENTER;
-
-	get_content_type(type, sizeof(type));
 
 	ret = add_rtsp_header(&request->headers,
 			      "Content-Type",
@@ -244,6 +242,54 @@ utility_retcode_t create_transport_header(struct rtsp_request *request)
 			      "Transport",
 			      "RTP/AVP/TCP;unicast;interleaved=0-1;mode=record",
 			      "Transport header");
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
+utility_retcode_t create_session_header(struct rtsp_request *request)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	ret = add_rtsp_header(&request->headers,
+			      "Session",
+			      request->session->identifier,
+			      "Session header");
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
+utility_retcode_t create_range_header(struct rtsp_request *request)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	ret = add_rtsp_header(&request->headers,
+			      "Range",
+			      "npt=0-",
+			      "Range header");
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
+utility_retcode_t create_rtp_info_header(struct rtsp_request *request)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	ret = add_rtsp_header(&request->headers,
+			      "RTP-Info",
+			      "seq=0;rtptime=0",
+			      "RTP-Info header");
 
 	FUNC_RETURN;
 	return ret;
@@ -552,8 +598,11 @@ utility_retcode_t clear_rtsp_request(struct rtsp_request *request)
 	FUNC_ENTER;
 
 	request->session->sequence_number++;
-	
+
 	utility_list_remove_all(&request->headers, header_destructor);
+
+	request->msg_body = '\0';
+	request->msg_bodyp = request->msg_body;
 
 	FUNC_RETURN;
 	return UTILITY_SUCCESS;

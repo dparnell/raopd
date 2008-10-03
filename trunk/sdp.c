@@ -258,9 +258,9 @@ utility_retcode_t add_msg_body_blank_line(struct rtsp_request *request)
 }
 
 
-utility_retcode_t build_msg_body(struct rtsp_request *request)
+utility_retcode_t get_msg_body(struct rtsp_request *request)
 {
-	utility_retcode_t ret;
+	utility_retcode_t ret = UTILITY_SUCCESS;;
 
 	FUNC_ENTER;
 
@@ -277,6 +277,22 @@ utility_retcode_t build_msg_body(struct rtsp_request *request)
 
 	} else {
 		syscalls_memset(request->msg_body, 0, request->msg_body_len);
+	}
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
+utility_retcode_t build_msg_body(struct rtsp_request *request)
+{
+	utility_retcode_t ret;
+
+	FUNC_ENTER;
+
+	if (UTILITY_SUCCESS != get_msg_body(request)) {
+		goto out;
 	}
 
 	request->msg_bodyp = request->msg_body;

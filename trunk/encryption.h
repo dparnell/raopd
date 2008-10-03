@@ -54,4 +54,8 @@ utility_retcode_t generate_aes_key(struct aes_data *aes_data);
 
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res);
 
+utility_retcode_t write_encrypted_data(int data_fd,
+				       int session_fd,
+				       struct aes_data *aes_data);
+
 #endif /* #ifndef ENCRYPTION_H */

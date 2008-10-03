@@ -27,6 +27,8 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 int main(void)
 {
+	struct rtsp_session session;
+
 	/* We can't output anything to the user until the lt framework
 	 * is initialized, so do that before anything else. */
 	lt_init();
@@ -38,7 +40,13 @@ int main(void)
 
 	NOTC("raopd starting\n");
 
-	rtsp_start_client();
+	lt_set_level(LT_RTSP_CLIENT, LT_DEBUG);
+	lt_set_level(LT_CLIENT, LT_DEBUG);
+
+	if (UTILITY_SUCCESS == rtsp_start_client(&session)) {
+		lt_set_level(LT_RTSP, LT_DEBUG);
+		rtsp_send_data(&session);
+	}
 
 	NOTC("raopd exiting\n");
 
