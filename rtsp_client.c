@@ -452,14 +452,16 @@ utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 		goto out;
 	}
 
+	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
+#define USE_RAOP_PLAY_CODE
+#ifdef USE_RAOP_PLAY_CODE
 	hacked_send_audio(pcm_data_file,
 			  session->session_fd,
 			  &session->aes_data);
-
-/*
+#else /* #ifdef USE_RAOP_PLAY_CODE */
 	session->data_fd = syscalls_open(pcm_data_file, O_RDONLY);
 	write_encrypted_data(session->data_fd, session->session_fd, &session->aes_data);
-*/
+#endif /* #ifdef USE_RAOP_PLAY_CODE */
 
 out:
 	FUNC_RETURN;

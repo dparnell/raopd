@@ -236,6 +236,8 @@ utility_retcode_t write_encrypted_data(int data_fd,
 			  1 /* encrypt */);
 
 	encoder_handle = open_faac_encoder(&num_input_samples, &max_output_bytes);
+	INFO("Opened FAAC encoder (num_input_samples: %d max_output_bytes: %d\n",
+	     (int)num_input_samples, (int)max_output_bytes);
 
 	pcm_buf = malloc(32 * 1024);
 	encoded_buf = malloc(32 * 1024);

@@ -116,7 +116,7 @@ static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 }
 
 
-static int auds_write_pcm(auds_t *auds, uint8_t *buffer, uint8_t **data, int *size,
+static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 			  int bsize, data_source_t *ds)
 {
 	uint8_t one[4];
@@ -124,84 +124,55 @@ static int auds_write_pcm(auds_t *auds, uint8_t *buffer, uint8_t **data, int *si
 	int bpos=0;
 	uint8_t *bp=buffer;
 	int i,nodata=0;
-	int16_t *pr=NULL;
-	int channels=2;
 
-	DEBG("AAC converting PCM data?\n");
+	// DEBG("Manipulating PCM data (size: %d bsize: %d)\n", *size, bsize);
 
-	if(auds) channels=auds->channels;
 	bits_write(&bp,1,3,&bpos); // channel=1, stereo
 	bits_write(&bp,0,4,&bpos); // unknown
 	bits_write(&bp,0,8,&bpos); // unknown
 	bits_write(&bp,0,4,&bpos); // unknown
-	if(bsize!=4096)
-		bits_write(&bp,1,1,&bpos); // hassize
-	else
-		bits_write(&bp,0,1,&bpos); // hassize
+	bits_write(&bp,0,1,&bpos); // hassize
 	bits_write(&bp,0,2,&bpos); // unused
 	bits_write(&bp,1,1,&bpos); // is-not-compressed
-	if(bsize!=4096){
-		bits_write(&bp,(bsize>>24)&0xff,8,&bpos); // size of data, integer, big endian
-		bits_write(&bp,(bsize>>16)&0xff,8,&bpos);
-		bits_write(&bp,(bsize>>8)&0xff,8,&bpos);
-		bits_write(&bp,bsize&0xff,8,&bpos);
-	}
-	while(1){
-		if(pr){
-			if(channels==1)
-				*((int16_t*)one)=*pr;
-			else
-				*((int16_t*)one)=*pr++;
-			*((int16_t*)one+1)=*pr++;
-		}else {
-			switch(ds->type){
-			case DESCRIPTOR:
-				if(channels==1){
-					if(syscalls_read(ds->u.fd, one, 2)!=2) nodata=1;
-					*((int16_t*)one+1)=*((int16_t*)one);
-				}else{
-					if(syscalls_read(ds->u.fd, one, 4)!=4) nodata=1;
-				}
-				break;
-			case STREAM:
-				if(channels==1){
-					if(fread(one,1,2,ds->u.inf)!=2) nodata=1;
-					*((int16_t*)one+1)=*((int16_t*)one);
-				}else{
-					if(fread(one,1,4,ds->u.inf)!=4) nodata=1;
-				}
-				break;
-			case MEMORY:
-				if(channels==1){
-					if(ds->u.mem.size<=count*2) nodata=1;
-					*((int16_t*)one)=ds->u.mem.data[count];
-					*((int16_t*)one+1)=*((int16_t*)one);
-				}else{
-					if(ds->u.mem.size<=count*4) nodata=1;
-					*((int16_t*)one)=ds->u.mem.data[count*2];
-					*((int16_t*)one+1)=ds->u.mem.data[count*2+1];
-				}
-				break;
-			default:
-				break;
-			}
+
+	while (1) {
+		if (ds->u.mem.size <= count*4) {
+			nodata = 1;
 		}
-		if(nodata) break;
+
+		*((int16_t*)one)=ds->u.mem.data[count*2];
+		*((int16_t*)one+1)=ds->u.mem.data[count*2+1];
+
+		if (nodata) {
+			break;
+		}
 
 		bits_write(&bp,one[1],8,&bpos);
 		bits_write(&bp,one[0],8,&bpos);
 		bits_write(&bp,one[3],8,&bpos);
 		bits_write(&bp,one[2],8,&bpos);
-		if(++count==bsize) break;
+
+		if (++count == bsize) {
+			break;
+		}
 	}
-	if(!count) return -1; // when no data at all, it should stop playing
+
+	if (!count) {
+		/* when no data at all, it should stop playing */
+		return -1;
+	}
+
 	/* when readable size is less than bsize, fill 0 at the bottom */
-	for(i=0;i<(bsize-count)*4;i++){
+	for (i = 0 ; i < ((bsize - count) * 4) ; i++) {
 		bits_write(&bp,0,8,&bpos);
 	}
-	*size=bp-buffer;
-	if(bpos) *size+=1;
-	*data=buffer;
+
+	*size = (bp - buffer);
+	if (bpos) {
+		*size += 1;
+	}
+
+	*data = buffer;
 	return 0;
 }
 
@@ -316,7 +287,7 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 
 	ds.u.mem.data=(int16_t*)rbuf;
 	bsize=ds.u.mem.size/4;
-	rval=auds_write_pcm(auds, pcm->buffer, data, size, bsize, &ds);
+	rval=auds_write_pcm(pcm->buffer, data, size, bsize, &ds);
 	free(rbuf);
 	return rval;
 }
@@ -627,9 +598,6 @@ static int main_event_handler()
 static raopcl_t *raopcl_open(struct aes_data *aes_data)
 {
 	raopcl_data_t *raopcld;
-	int16_t sdata[MINIMUM_SAMPLE_SIZE*2];
-	data_source_t ds={.type=MEMORY};
-	uint8_t *bp;
 
 	WARN("Starting client open\n");
 
@@ -657,12 +625,6 @@ static raopcl_t *raopcl_open(struct aes_data *aes_data)
 	memcpy(raopcld->nv,raopcld->iv,sizeof(raopcld->nv));
 	raopcld->volume = VOLUME_DEF;
         aes_set_key(&raopcld->ctx, raopcld->key, 128);
-	// prepare a small silent data to send during pause period.
-	ds.u.mem.size=MINIMUM_SAMPLE_SIZE*4;
-	ds.u.mem.data=sdata;
-	memset(sdata,0,sizeof(sdata));
-	auds_write_pcm(NULL, raopcld->min_sdata, &bp, &raopcld->min_sdata_size,
-		       MINIMUM_SAMPLE_SIZE, &ds);
 
 	return (raopcl_t *)raopcld;
 }
