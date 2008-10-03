@@ -19,6 +19,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef SDP_H
 #define SDP_H
 
+utility_retcode_t get_msg_body(struct rtsp_request *request);
 utility_retcode_t add_announce_sdp_fields(struct rtsp_request *request);
 utility_retcode_t build_msg_body(struct rtsp_request *request);
 utility_retcode_t add_msg_body_blank_line(struct rtsp_request *request);

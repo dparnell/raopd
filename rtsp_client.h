@@ -21,6 +21,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "rtsp.h"
 
-utility_retcode_t rtsp_start_client(void);
+utility_retcode_t rtsp_start_client(struct rtsp_session *session);
+utility_retcode_t rtsp_send_data(struct rtsp_session *session);
 
 #endif /* #ifndef RTSP_CLIENT_H */

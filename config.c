@@ -24,17 +24,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DEFAULT_FACILITY LT_CONFIG
 
-utility_retcode_t get_content_type(char *type, size_t size)
-{
-	FUNC_ENTER;
-
-	syscalls_strncpy(type, "application/sdp", size);
-
-	FUNC_RETURN;
-	return UTILITY_SUCCESS;
-}
-
-
 utility_retcode_t get_client(struct rtsp_client *client)
 {
 	FUNC_ENTER;

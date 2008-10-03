@@ -123,6 +123,8 @@ struct rtsp_session {
 	short port;
 	unsigned int sequence_number;
 	struct aes_data aes_data;
+	int data_fd;
+	int session_fd;
 };
 
 utility_retcode_t add_rtsp_header(struct utility_locked_list *list,
@@ -133,11 +135,15 @@ utility_retcode_t add_rtsp_header(struct utility_locked_list *list,
 void set_method(struct rtsp_request *request,
 		const char *method);
 utility_retcode_t create_cseq_header(struct rtsp_request *request);
-utility_retcode_t create_content_type_header(struct rtsp_request *request);
+utility_retcode_t create_content_type_header(struct rtsp_request *request,
+					     const char *type);
 utility_retcode_t create_content_length_header(struct rtsp_request *request);
 utility_retcode_t create_client_instance_header(struct rtsp_request *request);
 utility_retcode_t create_user_agent_header(struct rtsp_request *request);
 utility_retcode_t create_transport_header(struct rtsp_request *request);
+utility_retcode_t create_session_header(struct rtsp_request *request);
+utility_retcode_t create_range_header(struct rtsp_request *request);
+utility_retcode_t create_rtp_info_header(struct rtsp_request *request);
 utility_retcode_t create_apple_challenge_header(struct rtsp_request *request);
 utility_retcode_t build_request_string(struct rtsp_request *request);
 utility_retcode_t allocate_response_buffer(struct rtsp_response *response);

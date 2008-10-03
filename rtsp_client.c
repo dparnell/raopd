@@ -24,6 +24,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "rtsp.h"
 #include "rtsp_client.h"
 #include "sdp.h"
+#include "raop_play_send_audio.h"
 
 #define DEFAULT_FACILITY LT_RTSP_CLIENT
 
@@ -93,7 +94,7 @@ static utility_retcode_t send_announce_request(struct rtsp_request *request)
 			 request->session->url,
 			 sizeof(request->request_line.uri));
 
-	ret = create_content_type_header(request);
+	ret = create_content_type_header(request, "application/sdp");
 	if (UTILITY_SUCCESS != ret) {
 		ERRR("Could not create Content-Type header\n");
 		goto out;
@@ -176,6 +177,114 @@ out:
 }
 
 
+static utility_retcode_t send_record_request(struct rtsp_request *request)
+{
+	utility_retcode_t ret;
+
+	FUNC_ENTER;
+
+	ret = begin_request(request, "RECORD");
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+	ret = create_session_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Session header\n");
+		goto out;
+	}
+
+	ret = create_range_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Range header\n");
+		goto out;
+	}
+
+	ret = create_rtp_info_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create RTP-Info header\n");
+		goto out;
+	}
+
+	ret = create_user_agent_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create User-Agent header\n");
+		goto out;
+	}
+
+	ret = create_client_instance_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Client-Instance header\n");
+		goto out;
+	}
+
+	ret = finish_request(request);
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
+static utility_retcode_t send_volume_request(struct rtsp_request *request)
+{
+	utility_retcode_t ret;
+
+	FUNC_ENTER;
+
+	ret = begin_request(request, "SET_PARAMETER");
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+	ret = create_session_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Session header\n");
+		goto out;
+	}
+
+	ret = create_content_type_header(request, "text/parameters");
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Content-Type header\n");
+		goto out;
+	}
+
+	/* The volume message body is not any protocol--it's not SDP,
+	   it's in header format, but it's in the message body, so
+	   just treat it as a one off and format the string here. */
+	get_msg_body(request);
+	request->msg_body_bytes_remaining -=
+		snprintf(request->msg_body,
+			 request->msg_body_bytes_remaining,
+			 "volume: 0.000000\r\n");
+
+	ret = create_content_length_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Content-Length header\n");
+		goto out;
+	}
+
+	ret = create_user_agent_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create User-Agent header\n");
+		goto out;
+	}
+
+	ret = create_client_instance_header(request);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Could not create Client-Instance header\n");
+		goto out;
+	}
+
+	ret = finish_request(request);
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
+
 /*
 utility_retcode_t send_options_request(struct rtsp_request *request)
 {
@@ -218,76 +327,142 @@ static utility_retcode_t read_rtsp_response(struct rtsp_response *response)
 	return ret;
 }
 
-utility_retcode_t rtsp_start_client(void)
+utility_retcode_t rtsp_start_client(struct rtsp_session *session)
 {
 	utility_retcode_t ret;
-
-	struct rtsp_client client;
-	struct rtsp_server server;
-	struct rtsp_session session;
-	struct rtsp_request request;
-	struct rtsp_response response;
+	struct rtsp_client *client;
+	struct rtsp_server *server;
+	struct rtsp_request *request;
+	struct rtsp_response *response;
 
 	FUNC_ENTER;
 
 	INFO("Starting RTSP client\n");
 
-	init_rtsp_client(&client);
+	client = syscalls_malloc(sizeof(*client));
+	server = syscalls_malloc(sizeof(*server));
+	request = syscalls_malloc(sizeof(*request));
+	response = syscalls_malloc(sizeof(*response));
+
+	init_rtsp_client(client);
 	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
 
-	ret = init_rtsp_server(&server);
+	ret = init_rtsp_server(server);
 	if (UTILITY_FAILURE == ret) {
 		ERRR("Failed to initialize server\n");
 		goto out;
 	}
 
-	init_rtsp_session(&session, &client, &server);
-	init_rtsp_request(&request, &session);
-	init_rtsp_response(&response, &session);
+	init_rtsp_session(session, client, server);
+	init_rtsp_request(request, session);
+	init_rtsp_response(response, session);
 
-	INFO("Connecting to server \"%s\"\n", server.name);
+	INFO("Connecting to server \"%s\"\n", server->name);
 
-	ret = connect_server(&session);
+	ret = connect_server(session);
 	if (UTILITY_FAILURE == ret) {
-		ERRR("Failed to connect to server \"%s\"\n", server.name);
+		ERRR("Failed to connect to server \"%s\"\n", server->name);
 		goto out;
 	}
 
 	/*
-	send_options_request(&request);
-	read_rtsp_response(&response);
+	send_options_request(request);
+	read_rtsp_response(response);
 	*/
 
-	ret = send_announce_request(&request);
+	ret = send_announce_request(request);
 	if (UTILITY_FAILURE == ret) {
 		ERRR("Failed to send ANNOUNCE request to server \"%s\"\n",
-		     server.name);
+		     server->name);
 		goto out;
 	}
 
-	ret = read_rtsp_response(&response);
+	ret = read_rtsp_response(response);
 	if (UTILITY_FAILURE == ret) {
 		ERRR("Failed to read ANNOUNCE response from server \"%s\"\n",
-		     server.name);
+		     server->name);
 		goto out;
 	}
 
-	ret = send_setup_request(&request);
+	ret = send_setup_request(request);
 	if (UTILITY_FAILURE == ret) {
 		ERRR("Failed to send SETUP request to server \"%s\"\n",
-		     server.name);
+		     server->name);
 		goto out;
 	}
 
-	ret = read_rtsp_response(&response);
+	ret = read_rtsp_response(response);
 	if (UTILITY_FAILURE == ret) {
 		ERRR("Failed to read SETUP response from server \"%s\"\n",
-		     server.name);
+		     server->name);
 		goto out;
 	}
 
+	ret = send_record_request(request);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to send RECORD request to server \"%s\"\n",
+		     server->name);
+		goto out;
+	}
+
+	ret = read_rtsp_response(response);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to read RECORD response from server \"%s\"\n",
+		     server->name);
+		goto out;
+	}
+
+	ret = send_volume_request(request);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to send SET_PARAMETERS (volume) request to server \"%s\"\n",
+		     server->name);
+		goto out;
+	}
+
+	ret = read_rtsp_response(response);
+	if (UTILITY_FAILURE == ret) {
+		ERRR("Failed to read  response from server \"%s\"\n",
+		     server->name);
+		goto out;
+	}
 
 out:
 	FUNC_RETURN;
 	return ret;
 }
+
+
+#define PCM_DATA_FILE "./faactest/sndtest.raw"
+
+utility_retcode_t rtsp_send_data(struct rtsp_session *session)
+{
+	char pcm_data_file[] = PCM_DATA_FILE;
+	utility_retcode_t ret = UTILITY_SUCCESS;
+
+	FUNC_ENTER;
+
+	DEBG("Connecting to host \"%s\" port %d\n",
+	     session->server->host, session->port);
+
+	ret = connect_to_port(session->server->host,
+			      session->port,
+			      &session->session_fd);
+
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+	hacked_send_audio(pcm_data_file,
+			  session->session_fd,
+			  &session->aes_data);
+
+/*
+	session->data_fd = syscalls_open(pcm_data_file, O_RDONLY);
+	write_encrypted_data(session->data_fd, session->session_fd, &session->aes_data);
+*/
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+

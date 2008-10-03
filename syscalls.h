@@ -27,6 +27,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 int syscalls_open(const char *pathname, int flags);
 int syscalls_close(int fd);
@@ -96,5 +97,6 @@ int syscalls_pthread_join(pthread_t thread, void **value_ptr);
 #define syscalls_ntohs ntohs
 
 #define syscalls_abort abort
+#define syscalls_gettimeofday gettimeofday
 
 #endif /* #ifndef SYSCALLS_H */
