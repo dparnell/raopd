@@ -25,9 +25,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <arpa/inet.h>
 
-#include <faac.h>
-#include <faaccfg.h>
-
 #include "lt.h"
 #include "utility.h"
 #include "syscalls.h"
@@ -110,41 +107,6 @@ struct transmit_buffer {
 #define PCM_READ_SIZE 4096
 #define PCM_BYTES_PER_SAMPLE 2
 
-static faacEncHandle open_faac_encoder(unsigned long *num_input_samples,
-				       unsigned long *max_output_bytes)
-{
-	faacEncHandle encoder_handle;
-	faacEncConfigurationPtr format;
-
-	encoder_handle = faacEncOpen(44100,
-				     2,
-				     num_input_samples,
-				     max_output_bytes);
-
-	INFO("Encoder opened (num_input_samples: %lu "
-	     "max_output_bytes: %lu)\n",
-	     *num_input_samples,
-	     *max_output_bytes);
-
-	format = faacEncGetCurrentConfiguration(encoder_handle);
-
-	INFO("Got current configuration\n");
-
-	format->aacObjectType = LOW;
-	format->mpegVersion = MPEG4;
-	format->useTns = 0; /* Temporal Noise Shaping, 0 is default */
-	format->allowMidside = 1;
-	format->outputFormat = 1; /* ADTS: Audio Data Transport Stream */
-	format->bandWidth = 0;
-	format->inputFormat = FAAC_INPUT_16BIT;
-
-	faacEncSetConfiguration(encoder_handle, format);
-
-	INFO("Set configuration parameters\n");
-
-	return encoder_handle;
-}
-
 
 static int read_aex(int session_fd)
 {
@@ -214,10 +176,10 @@ utility_retcode_t write_encrypted_data(int data_fd,
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
         };
-	faacEncHandle encoder_handle;
+
 	int done = 0;
-	unsigned long num_input_samples, max_output_bytes;
-	int bytes_encoded, num_samples_read;
+	unsigned long num_input_samples = 0;
+	int bytes_encoded = 0, num_samples_read;
 	uint8_t *pcm_buf, *encoded_buf;
 	size_t pcm_bytes_read;
 
@@ -234,10 +196,6 @@ utility_retcode_t write_encrypted_data(int data_fd,
 			  aes_data->key,
 			  aes_data->iv,
 			  1 /* encrypt */);
-
-	encoder_handle = open_faac_encoder(&num_input_samples, &max_output_bytes);
-	INFO("Opened FAAC encoder (num_input_samples: %d max_output_bytes: %d\n",
-	     (int)num_input_samples, (int)max_output_bytes);
 
 	pcm_buf = malloc(32 * 1024);
 	encoded_buf = malloc(32 * 1024);
@@ -256,12 +214,6 @@ utility_retcode_t write_encrypted_data(int data_fd,
 
 		DEBG("Read %d bytes of pcm data (%d samples); calling encode\n",
 		     pcm_bytes_read, num_samples_read);
-
-		bytes_encoded = faacEncEncode(encoder_handle,
-					      (int32_t *)pcm_buf,
-					      num_samples_read,
-					      encoded_buf,
-					      max_output_bytes);
 
 		DEBG("Encoded %d bytes\n", bytes_encoded);
 
@@ -316,8 +268,6 @@ utility_retcode_t write_encrypted_data(int data_fd,
 	}
 
 	printf("Closing encoder handle\n");
-
-	faacEncClose(encoder_handle);
 
 	EVP_CipherFinal_ex(&ctx, encrypted_buf, &encrypted_len); 
 	EVP_CIPHER_CTX_cleanup(&ctx);

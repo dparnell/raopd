@@ -24,7 +24,7 @@ CFLAGS += -ggdb -Wall -Wextra -Wunused -Werror -Wshadow \
 	-Wdeclaration-after-statement -Wmissing-prototypes \
 	-pedantic-errors -O2 -std=c99 -pthread -D_GNU_SOURCE -D_REENTRANT
 
-LINK_FLAGS += -lpthread -lgmp -lcrypto -lfaac
+LINK_FLAGS += -lpthread -lgmp -lcrypto
 
 .PHONY: all
 all: $(TARGETS)

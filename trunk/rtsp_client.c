@@ -432,7 +432,7 @@ out:
 }
 
 
-#define PCM_DATA_FILE "./faactest/sndtest.raw"
+#define PCM_DATA_FILE "./faactest/sndtest_raw"
 
 utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 {
