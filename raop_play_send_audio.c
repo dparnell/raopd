@@ -96,22 +96,24 @@ static int pcm_close(auds_t *auds)
  */
 static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 {
-	int lb,rb,bd;
-	lb=7-*bpos;
-	rb=lb-blen+1;
-	if(rb>=0){
-		bd=d<<rb;
-		if(*bpos)
-			**p|=bd;
-		else
-			**p=bd;
-		*bpos+=blen;
-	}else{
-		bd=d>>-rb;
-		**p|=bd;
-		*p+=1;
-		**p=d<<(8+rb);
-		*bpos=-rb;
+	int lb, rb, bd;
+	lb = 7 - *bpos;
+	rb = lb - blen + 1;
+
+	if (rb >= 0) {
+		bd = d << rb;
+		if (*bpos) {
+			**p |= bd;
+		} else {
+			**p = bd;
+		}
+		*bpos += blen;
+	} else {
+		bd = d >> (-rb);
+		**p |= bd;
+		*p += 1;
+		**p = d << (8 + rb);
+		*bpos = (-rb);
 	}
 }
 
@@ -265,11 +267,12 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 	/* ds.u.mem.size, ds.u.mem.data */
 	bytes_read = syscalls_read(pcm->dfd,rbuf,bsize*4);
 	ds.u.mem.size = bytes_read;
+	total_read += bytes_read;
 
 	DEBG("Read %d bytes from PCM audio file (total: %d)\n",
 	     (int)bytes_read, total_read);
 
-	if (ds.u.mem.size == 0){
+	if (bytes_read == 0){
 		INFO("End of audio file\n");
 		return -1;
 	}
@@ -278,8 +281,6 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 		ERRR("%s: data read error(%s)\n", __func__, strerror(errno));
 		return -1;
 	}
-
-	total_read += bytes_read;
 
 	if (ds.u.mem.size < MINIMUM_SAMPLE_SIZE * 4) {
 		ds.u.mem.size = MINIMUM_SAMPLE_SIZE * 4;
@@ -405,9 +406,9 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count )
 	const int header_size=sizeof(header);
 	raopcl_data_t *raopcld;
 
-	if(!p) return -1;
-
 	INFO("Preparing to send audio sample\n");
+
+	if (!p) return -1;
 
 	raopcld=(raopcl_data_t *)p;
 
@@ -506,20 +507,6 @@ static int raopcl_aexbuf_time(raopcl_t *p, struct timeval *dtv)
 	DEBG("%s:tv_sec=%d, tv_usec=%d\n",__func__,(int)dtv->tv_sec,(int)dtv->tv_usec);
 
 	return 0;
-}
-
-
-static int raopcl_sample_remsize(raopcl_t *p)
-{
-	raopcl_data_t *raopcld = (raopcl_data_t *)p;
-
-	if (!p) {
-		return -1;
-	}
-
-	DEBG("wblk_remsize is %d\n", raopcld->wblk_remsize);
-
-	return raopcld->wblk_remsize;
 }
 
 
@@ -630,6 +617,14 @@ static raopcl_t *raopcl_open(struct aes_data *aes_data)
 }
 
 
+static int raopcl_sample_remsize(raopcl_t *p)
+{
+	raopcl_data_t *raopcld=(raopcl_data_t *)p;
+	if(!p) return -1;
+	return raopcld->wblk_remsize;
+}
+
+
 int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes_data)
 {
 	int rval = 0;
@@ -637,8 +632,7 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 	int size = 0;
 	raopcl_data_t *raopcl;
 	int i;
-
-	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_DEBUG);
+	int pcm_datafile_open = 0;
 
 	INFO("PCM audio file: \"%s\" session_fd: %d\n", pcm_audio_file, session_fd);
 
@@ -647,26 +641,35 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 		raopld->fds[i].fd = -1;
 	}
 	raopld->auds = auds_open(pcm_audio_file, AUD_TYPE_PCM);
+	pcm_datafile_open = 1;
 	raopld->raopcl = raopcl_open(aes_data);
 
 	raopcl = (raopcl_data_t *)raopld->raopcl;
 	raopcl->sfd = session_fd;
 
-	while (!rval) {
+	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_DEBUG);
+
+	rval=0;
+	while(!rval){
 
 		INFO("rval: %d\n", rval);
 
-		pcm_get_next_sample(raopld->auds, &buf, &size);
+		if(!raopld->auds){
+			WARN("audio data closed\n");
+			// if audio data is not opened, just check events
+			rval=main_event_handler(raopld);
+			continue;
+		}
 
-		raopcl_send_sample(raopld->raopcl, buf, size);
-
-		do {
-			DEBG("Before main event handler\n");
-			if ((rval = main_event_handler())) {
-				break;
-			}
-
-		} while (raopld->auds && raopcl_sample_remsize(raopld->raopcl));
+		if(pcm_get_next_sample(raopld->auds, &buf, &size)){
+			auds_close(raopld->auds);
+			raopld->auds=NULL;
+			raopcl_wait_songdone(raopld->raopcl,1);
+		}
+		if(raopcl_send_sample(raopld->raopcl,buf,size)) break;
+		do{
+			if((rval=main_event_handler())) break;
+		}while(raopld->auds && raopcl_sample_remsize(raopld->raopcl));
 	}
 
 	return 0;
