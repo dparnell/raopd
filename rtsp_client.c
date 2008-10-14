@@ -450,6 +450,8 @@ utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 		goto out;
 	}
 
+	get_pcm_data_file(session->audio_stream.pcm_data_file,
+			  sizeof(session->audio_stream.pcm_data_file));
 	session->audio_stream.pcm_fd =
 		syscalls_open(session->audio_stream.pcm_data_file, O_RDONLY);
 
