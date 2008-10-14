@@ -499,18 +499,17 @@ utility_retcode_t init_rtsp_client(struct rtsp_client *client)
 	FUNC_ENTER;
 
 	syscalls_memset(client, 0, sizeof(*client));
-	get_client(client);
-	ret = get_user_agent(client);
-	if (UTILITY_FAILURE == ret) {
-		goto out;
-	}
+	get_client_name(client->name, sizeof(client->name));
+	get_client_host(client->host, sizeof(client->host));
+	get_client_version(client->version, sizeof(client->version));
+	get_user_agent(client->user_agent, sizeof(client->user_agent));
 
 	ret = get_random_bytes(client->challenge, sizeof(client->challenge));
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	ret = get_client_instance(client);
+	ret = get_client_instance(client->instance, sizeof(client->instance));
 
 out:
 	FUNC_RETURN;
@@ -528,19 +527,15 @@ utility_retcode_t destroy_rtsp_client(struct rtsp_client *client)
 
 utility_retcode_t init_rtsp_server(struct rtsp_server *server)
 {
-	utility_retcode_t ret;
+	FUNC_ENTER;
 
 	syscalls_memset(server, 0, sizeof(*server));
-	get_server(server);
+	get_server_name(server->name, sizeof(server->name));
+	get_server_host(server->host, sizeof(server->host));
+	get_server_port(&server->port);
 
-	ret = get_server_encoded_rsa_public_key(server);
-	if (UTILITY_FAILURE == ret) {
-		goto out;
-	}
-
-out:
 	FUNC_RETURN;
-	return ret;
+	return UTILITY_SUCCESS;
 }
 
 

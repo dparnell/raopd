@@ -23,8 +23,8 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "client.h"
 #include "rtsp.h"
 #include "rtsp_client.h"
+#include "audio_stream.h"
 #include "sdp.h"
-#include "raop_play_send_audio.h"
 
 #define DEFAULT_FACILITY LT_RTSP_CLIENT
 
@@ -432,12 +432,10 @@ out:
 }
 
 
-#define PCM_DATA_FILE "./faactest/sndtest_raw"
-
 utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 {
-	char pcm_data_file[] = PCM_DATA_FILE;
 	utility_retcode_t ret = UTILITY_SUCCESS;
+	long arg;
 
 	FUNC_ENTER;
 
@@ -446,22 +444,38 @@ utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 
 	ret = connect_to_port(session->server->host,
 			      session->port,
-			      &session->session_fd);
+			      &session->audio_stream.session_fd);
 
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}
 
-	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
-#define USE_RAOP_PLAY_CODE
-#ifdef USE_RAOP_PLAY_CODE
-	hacked_send_audio(pcm_data_file,
-			  session->session_fd,
+	session->audio_stream.pcm_fd =
+		syscalls_open(session->audio_stream.pcm_data_file, O_RDONLY);
+
+	if (session->audio_stream.pcm_fd < 0) { 
+		ERRR("Failed to open PCM data file\n");
+		ret = UTILITY_FAILURE;
+		goto out;
+	}
+
+	/* XXX need fcntl added to syscalls.c */
+	if ((arg = fcntl(session->audio_stream.session_fd, F_GETFL, NULL)) < 0) { 
+		ERRR("Error fcntl(..., F_GETFL) (%s)\n", strerror(errno));
+		ret = UTILITY_FAILURE;
+		goto out;
+	}
+
+	arg |= O_NONBLOCK; 
+
+	if (fcntl(session->audio_stream.session_fd, F_SETFL, arg) < 0) { 
+		ERRR("Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
+		ret = UTILITY_FAILURE;
+		goto out;
+	}
+
+	send_audio_stream(&session->audio_stream,
 			  &session->aes_data);
-#else /* #ifdef USE_RAOP_PLAY_CODE */
-	session->data_fd = syscalls_open(pcm_data_file, O_RDONLY);
-	write_encrypted_data(session->data_fd, session->session_fd, &session->aes_data);
-#endif /* #ifdef USE_RAOP_PLAY_CODE */
 
 out:
 	FUNC_RETURN;
