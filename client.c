@@ -39,9 +39,9 @@ utility_retcode_t connect_server(struct rtsp_session *session)
 
 	ret = connect_to_port(session->server->host,
 			      session->server->port,
-			      &session->fd);
+			      &session->control_fd);
 
-	INFO("fd for server connection: %d\n", session->fd);
+	INFO("fd for server control connection: %d\n", session->control_fd);
 
 	FUNC_RETURN;
 	return ret;
@@ -62,7 +62,7 @@ utility_retcode_t send_request(struct rtsp_request *request)
 	     "----------------------------------------\n", request->buf);
 
 	/* XXX This write call needs a timeout. */
-	ret = syscalls_write(session->fd,
+	ret = syscalls_write(session->control_fd,
 			     request->buf,
 			     request->request_length);
 
@@ -90,7 +90,7 @@ utility_retcode_t read_response(struct rtsp_response *response)
 
 	syscalls_memset(response->buf, 0, response->buflen);
 
-	DEBG("before read from fd %d\n", session->fd);
+	DEBG("before read from fd %d\n", session->control_fd);
 
 	/* XXX This read call is not correct--it needs to have a
 	   timeout and it assumes that all the data is going to come
@@ -130,10 +130,10 @@ utility_retcode_t read_response(struct rtsp_response *response)
 
 	*/
 
-	ret = syscalls_read(session->fd,
+	ret = syscalls_read(session->control_fd,
 			    response->buf,
 			    response->buflen);
-	DEBG("after read from fd %d\n", session->fd);
+	DEBG("after read from fd %d\n", session->control_fd);
 
 	if (ret > 0) {
 		response->buflen = ret;

@@ -19,6 +19,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <errno.h>
+#include <arpa/inet.h>
 
 #include "syscalls.h"
 #include "utility.h"
@@ -96,9 +97,16 @@ static int pcm_close(auds_t *auds)
  */
 static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 {
-	int lb, rb, bd;
+	int8_t lb, rb, bd;
+	int dval;
+
+	/* leftmost bit is 7 - position */
 	lb = 7 - *bpos;
+	/* rightmost bit is left bit - length - 1 */
 	rb = lb - blen + 1;
+
+	dval = (int)d;
+	// DEBG("**p: 0x%x d: 0x%x blen: %d *bpos: %d\n", **p, dval, blen, *bpos);
 
 	if (rb >= 0) {
 		bd = d << rb;
@@ -117,7 +125,8 @@ static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 	}
 }
 
-
+#define USE_AUDS_WRITE
+#ifdef USE_AUDS_WRITE
 static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 			  int bsize, data_source_t *ds)
 {
@@ -126,8 +135,14 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	int bpos=0;
 	uint8_t *bp=buffer;
 	int i,nodata=0;
+	static uint8_t *orig_bp = NULL;
 
-	// DEBG("Manipulating PCM data (size: %d bsize: %d)\n", *size, bsize);
+	DEBG("Manipulating PCM data (size: %d bsize: %d)\n", *size, bsize);
+
+	/* This looks like a header for the data block.  I would think
+	 * it would be fairly easy to create a struct for the
+	 * bitfields and set them that way, rather than bit by bit. */
+	orig_bp = bp;
 
 	bits_write(&bp,1,3,&bpos); // channel=1, stereo
 	bits_write(&bp,0,4,&bpos); // unknown
@@ -136,6 +151,12 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	bits_write(&bp,0,1,&bpos); // hassize
 	bits_write(&bp,0,2,&bpos); // unused
 	bits_write(&bp,1,1,&bpos); // is-not-compressed
+
+	DEBG("orig_bp: %p bp: %p bp - orig_bp: 0x%x orig_bp as hex: 0x%x\n",
+	     (void *)orig_bp,
+	     (void *)bp,
+	     (int)(bp - orig_bp),
+	     (short)*orig_bp);
 
 	while (1) {
 		if (ds->u.mem.size <= count*4) {
@@ -149,6 +170,9 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 			break;
 		}
 
+		/* Is this code just reversing the byte order of the
+		 * PCM data, i.e., on Intel architectures, converting
+		 * it to network byte order?  */
 		bits_write(&bp,one[1],8,&bpos);
 		bits_write(&bp,one[0],8,&bpos);
 		bits_write(&bp,one[3],8,&bpos);
@@ -177,7 +201,7 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	*data = buffer;
 	return 0;
 }
-
+#endif /* #ifdef USE_AUDS_WRITE */
 
 static int aud_clac_chunk_size(int sample_rate)
 {
@@ -252,13 +276,15 @@ erexit:
 
 static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 {
-	int rval;
+	int rval = 0;
 	pcm_t *pcm=(pcm_t *)auds->stream;
 	int bsize = auds->chunk_size;
 	data_source_t ds={.type=MEMORY};
 	uint8_t *rbuf=NULL;
 	size_t bytes_read;
 	static int total_read = 0;
+	char bits[128];
+	uint8_t *displayp;
 
 	INFO("Preparing to get next PCM audio sample (fd: %d\n", pcm->dfd);
 
@@ -288,7 +314,34 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 
 	ds.u.mem.data=(int16_t*)rbuf;
 	bsize=ds.u.mem.size/4;
+#ifdef USE_AUDS_WRITE
 	rval=auds_write_pcm(pcm->buffer, data, size, bsize, &ds);
+#else /* #ifdef USE_AUDS_WRITE */
+	*(short *)pcm->buffer = (short)0x20;
+	DEBG("data: %p size: %d ds.u.mem.size: %d encoded_buf: 0x%x\n",
+	     (void *)data, *size, ds.u.mem.size, (short)*(pcm->buffer));
+
+	for (int i = 0 ; i < ds.u.mem.size ; i += 1) {
+		//*(pcm->buffer + i + 2) = syscalls_htons(*(rbuf + i));
+		*(pcm->buffer + i + 2) = *(rbuf + i);
+	}
+#endif /* #ifdef USE_AUDS_WRITE */
+
+	displayp = pcm->buffer;
+	DEBG("buf: 0x%x 0x%x 0x%x\n",
+	     (unsigned int)*displayp,
+	     (unsigned int)*(displayp + 1),
+	     (unsigned int)*(displayp + 2));
+
+	DEBG("Starting bit dump\n");
+	/* Let's spit out the bitfields and see what they are: */
+	for (int i = 0 ; i < 8 ; i++) {
+		uint32_t *bitp;
+		bitp = ((uint32_t *)pcm->buffer) + i;
+		bits_to_string(*bitp, sizeof(*bitp) * 8, bits, sizeof(bits));
+		DEBG("bp: %s\n", bits);
+	}
+
 	free(rbuf);
 	return rval;
 }
@@ -431,6 +484,8 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count )
 	encrypt(raopcld, raopcld->data+header_size, count);
 
 	len=count+header_size;
+	DEBG("encrypted len: %d\n", len);
+
 	raopcld->wblk_remsize=count+header_size;
 	raopcld->wblk_wsize=0;
 

@@ -28,6 +28,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 
 int syscalls_open(const char *pathname, int flags);
 int syscalls_close(int fd);

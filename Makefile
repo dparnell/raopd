@@ -11,6 +11,7 @@ RAOPD_OBJS += config.o
 RAOPD_OBJS += rtsp.o
 RAOPD_OBJS += rtsp_client.o
 RAOPD_OBJS += sdp.o
+RAOPD_OBJS += audio_stream.o
 RAOPD_OBJS += raop_play_send_audio.o
 RAOPD_OBJS += aes.o
 
@@ -24,7 +25,7 @@ CFLAGS += -ggdb -Wall -Wextra -Wunused -Werror -Wshadow \
 	-Wdeclaration-after-statement -Wmissing-prototypes \
 	-pedantic-errors -O2 -std=c99 -pthread -D_GNU_SOURCE -D_REENTRANT
 
-LINK_FLAGS += -lpthread -lgmp -lcrypto
+LINK_FLAGS += -lpthread -lcrypto
 
 .PHONY: all
 all: $(TARGETS)

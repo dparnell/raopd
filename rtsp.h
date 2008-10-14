@@ -21,23 +21,13 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "utility.h"
 #include "encryption.h"
-
-#define RTSP_MAX_REQUEST_LEN	4096
-#define RTSP_MAX_RESPONSE_LEN	4096
-#define MAX_METHOD_LEN		32
-#define MAX_URI_LEN		64
-#define MAX_VERSION_LEN		4
-#define MAX_SESSION_ID_LEN	16
-#define MAX_URL_LEN		64
-#define MAX_HEADER_NAME_LEN	4096 /* Total overkill */
-#define MAX_HEADER_VALUE_LEN	4096
-#define MAX_INSTANCE_LEN	32
+#include "audio_stream.h"
 
 struct rtsp_client {
 	char name[MAX_NAME_LEN];
 	char host[MAX_HOST_NAME_LEN];
 	char version[MAX_VERSION_LEN];
-	char *user_agent;
+	char user_agent[MAX_USER_AGENT_LEN];
 	uint8_t challenge[16];
 	char instance[MAX_INSTANCE_LEN];
 };
@@ -112,7 +102,6 @@ struct rtsp_response {
 struct rtsp_session {
 	struct rtsp_client *client;
 	struct rtsp_server *server;
-	int fd;
 	char identifier[MAX_SESSION_ID_LEN]; /* Note: RFC2326 §3.4
 					      * specifies arbitrary
 					      * length with 8
@@ -121,10 +110,10 @@ struct rtsp_session {
 					      * Express uses 8. */
 	char url[MAX_URL_LEN];
 	short port;
+	int control_fd;
 	unsigned int sequence_number;
 	struct aes_data aes_data;
-	int data_fd;
-	int session_fd;
+	struct audio_stream audio_stream;
 };
 
 utility_retcode_t add_rtsp_header(struct utility_locked_list *list,

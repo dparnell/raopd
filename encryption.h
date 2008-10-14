@@ -19,8 +19,13 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/engine.h>
+#include <openssl/bn.h>
+
 #include "utility.h"
-#include "rtsp.h"
 
 #define RAOP_AES_BLOCK_SIZE		64
 #define RAOP_AES_IV_LEN			16
@@ -47,6 +52,7 @@ struct aes_data {
 	uint8_t iv[RAOP_AES_IV_LEN];
 	uint8_t key[RAOP_AES_KEY_LEN];
 	uint8_t rsa_encrypted_key[RAOP_RSA_PUB_MODULUS_LEN];
+	EVP_CIPHER_CTX ctx;
 };
 
 utility_retcode_t generate_aes_iv(struct aes_data *aes_data);
@@ -57,5 +63,17 @@ int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res);
 utility_retcode_t write_encrypted_data(int data_fd,
 				       int session_fd,
 				       struct aes_data *aes_data);
+
+utility_retcode_t initialize_aes(struct aes_data *aes_data);
+
+utility_retcode_t shutdown_aes(struct aes_data *aes_data,
+			       uint8_t *encrypted_buf,
+			       size_t *encrypted_len);
+
+utility_retcode_t aes_encrypt_data(struct aes_data *aes_data,
+				   uint8_t *encrypted_buf,
+				   size_t *encrypted_len,
+				   uint8_t *cleartext_buf,
+				   size_t cleartext_len);
 
 #endif /* #ifndef ENCRYPTION_H */
