@@ -29,6 +29,7 @@ utility_retcode_t get_pcm_data_file(char *s, size_t size)
 	FUNC_ENTER;
 
 	syscalls_strncpy(s, "./faactest/sndtest_raw", size);
+	//syscalls_strncpy(s, "datapattern", size);
 
 	FUNC_RETURN;
 	return UTILITY_SUCCESS;

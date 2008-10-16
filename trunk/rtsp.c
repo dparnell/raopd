@@ -566,14 +566,7 @@ utility_retcode_t init_rtsp_session(struct rtsp_session *session,
 	syscalls_snprintf(session->url, MAX_URL_LEN, "rtsp://%s/%s",
 			  client->host, session->identifier);
 
-	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
-
-	ret = generate_aes_iv(aes_data);
-	if (UTILITY_SUCCESS != ret) {
-		goto out;
-	}
-
-	ret = generate_aes_key(aes_data);
+	ret = generate_aes_data(aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		goto out;
 	}

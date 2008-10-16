@@ -66,6 +66,31 @@ utility_retcode_t generate_aes_key(struct aes_data *aes_data)
 }
 
 
+utility_retcode_t generate_aes_data(struct aes_data *aes_data)
+{
+	utility_retcode_t ret;
+
+	FUNC_ENTER;
+
+	DEBG("Generating AES data\n");
+
+	ret = generate_aes_key(aes_data);
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+	ret = generate_aes_iv(aes_data);
+	if (UTILITY_SUCCESS != ret) {
+		goto out;
+	}
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
+
 int raopd_rsa_encrypt_openssl(uint8_t *text, int len, uint8_t *res)
 {
 	RSA *rsa;
@@ -105,7 +130,7 @@ utility_retcode_t initialize_aes(struct aes_data *aes_data)
 	EVP_CIPHER_CTX_init(&aes_data->ctx);
 
 	EVP_CipherInit_ex(&aes_data->ctx,
-			  EVP_aes_256_cbc(),
+			  EVP_aes_128_cbc(),
 			  NULL,
 			  aes_data->key,
 			  aes_data->iv,

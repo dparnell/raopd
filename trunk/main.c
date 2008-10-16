@@ -34,17 +34,9 @@ int main(void)
 	lt_init();
 	FUNC_ENTER;
 
-	lt_set_level(LT_MAIN, LT_INFO);
-	lt_set_level(LT_CLIENT, LT_NOTICE);
-	lt_set_level(LT_ENCODING, LT_DEBUG);
-
 	NOTC("raopd starting\n");
 
-	lt_set_level(LT_RTSP_CLIENT, LT_DEBUG);
-	lt_set_level(LT_CLIENT, LT_DEBUG);
-
 	if (UTILITY_SUCCESS == rtsp_start_client(&session)) {
-		lt_set_level(LT_RTSP, LT_DEBUG);
 		rtsp_send_data(&session);
 	}
 

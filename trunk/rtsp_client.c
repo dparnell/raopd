@@ -345,7 +345,6 @@ utility_retcode_t rtsp_start_client(struct rtsp_session *session)
 	response = syscalls_malloc(sizeof(*response));
 
 	init_rtsp_client(client);
-	lt_set_level(LT_ENCRYPTION, LT_DEBUG);
 
 	ret = init_rtsp_server(server);
 	if (UTILITY_FAILURE == ret) {
@@ -421,7 +420,7 @@ utility_retcode_t rtsp_start_client(struct rtsp_session *session)
 
 	ret = read_rtsp_response(response);
 	if (UTILITY_FAILURE == ret) {
-		ERRR("Failed to read  response from server \"%s\"\n",
+		ERRR("Failed to read SET_PARAMETERS response from server \"%s\"\n",
 		     server->name);
 		goto out;
 	}
@@ -435,7 +434,6 @@ out:
 utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
-	long arg;
 
 	FUNC_ENTER;
 
@@ -450,32 +448,12 @@ utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 		goto out;
 	}
 
-	get_pcm_data_file(session->audio_stream.pcm_data_file,
-			  sizeof(session->audio_stream.pcm_data_file));
-	session->audio_stream.pcm_fd =
-		syscalls_open(session->audio_stream.pcm_data_file, O_RDONLY);
-
-	if (session->audio_stream.pcm_fd < 0) { 
-		ERRR("Failed to open PCM data file\n");
-		ret = UTILITY_FAILURE;
+	if (UTILITY_SUCCESS != init_audio_stream(&session->audio_stream)) {
+		ERRR("Failed to initialized audio stream\n");
 		goto out;
 	}
 
-	/* XXX need fcntl added to syscalls.c */
-	if ((arg = fcntl(session->audio_stream.session_fd, F_GETFL, NULL)) < 0) { 
-		ERRR("Error fcntl(..., F_GETFL) (%s)\n", strerror(errno));
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
-	arg |= O_NONBLOCK; 
-
-	if (fcntl(session->audio_stream.session_fd, F_SETFL, arg) < 0) { 
-		ERRR("Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
+	lt_set_level(LT_AUDIO_STREAM, LT_DEBUG);
 	send_audio_stream(&session->audio_stream,
 			  &session->aes_data);
 
