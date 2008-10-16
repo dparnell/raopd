@@ -122,10 +122,17 @@ again:
 		if (errno == EINTR) {
 			goto again;
 		}
-		ERRR("Read failed: %s (fd: %d)\n", strerror(errno), fd);
-	}
 
-	INFO("Read %d bytes (fd: %d)\n", (int)ret, (int)fd);
+		if (errno == EAGAIN) {
+			DEBG("Got EAGAIN from read\n");
+		} else {
+			ERRR("Read failed: %s (fd: %d)\n", strerror(errno), fd);
+		}
+
+	} else {
+
+		INFO("Read %d bytes (fd: %d)\n", (int)ret, (int)fd);
+	}
 
 	return ret;
 }
@@ -391,7 +398,7 @@ int syscalls_pthread_join(pthread_t thread, void **value_ptr) {
 }
 
 
-int syscalls_open(const char *pathname, int flags)
+int syscalls_open(const char *pathname, int flags, mode_t mode)
 {
 	int ret;
 
@@ -400,15 +407,16 @@ int syscalls_open(const char *pathname, int flags)
 		return UTILITY_FAILURE;
 	}
 
-	DEBG("Attempting to open \"%s\" with flags 0x%x\n", pathname, flags);
+	DEBG("Attempting to open \"%s\" with flags 0x%x and mode 0x%x\n",
+	     pathname, flags, mode);
 
-	if ((ret = open(pathname, flags)) < 0) {
-		ERRR("Failed to open \"%s\" with flags 0x%x: %s\n",
-		     pathname, flags, strerror(ret));
+	if ((ret = open(pathname, flags, mode)) < 0) {
+		ERRR("Failed to open \"%s\" with flags 0x%x and mode 0x%x: %s\n",
+		     pathname, flags, mode, strerror(ret));
 	}
 
-	INFO("Opened \"%s\" with flags 0x%x successfully (fd: %d)\n",
-	     pathname, flags, ret);
+	INFO("Opened \"%s\" with flags 0x%x and mode 0x%x successfully (fd: %d)\n",
+	     pathname, flags, mode, ret);
 
 	return ret;
 }

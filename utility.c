@@ -640,7 +640,7 @@ utility_retcode_t get_random_bytes(uint8_t *buf, size_t size)
 
 	FUNC_ENTER;
 
-	fd = syscalls_open(RANDOM_SOURCE_PATH, O_RDONLY);
+	fd = syscalls_open(RANDOM_SOURCE_PATH, O_RDONLY, 0);
 	if (fd < 0) {
 		ERRR("Failed to open random source \"%s\"\n", RANDOM_SOURCE_PATH);
 		goto failed;

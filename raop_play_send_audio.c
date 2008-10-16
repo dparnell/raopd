@@ -60,21 +60,23 @@ static inline int realloc_memory(void **p, int newsize, const char *func)
 static int encrypt(raopcl_data_t *raopcld, uint8_t *data, int size)
 {
 	uint8_t *buf;
-	int i=0,j;
+	int i = 0, j;
 
-	INFO("Encrypting data\n");
+	ERRR("Encrypting data (size: %d)\n", size);
 
-	memcpy(raopcld->nv,raopcld->iv,16);
+	memcpy(raopcld->nv, raopcld->iv, 16);
 
-	while(i+16<=size){
-		buf=data+i;
-		for(j=0;j<16;j++) buf[j] ^= raopcld->nv[j];
+	while (i + 16 <= size) {
+		buf = data + i;
+		for (j = 0 ; j < 16 ; j++) {
+			buf[j] ^= raopcld->nv[j];
+		}
 		aes_encrypt(&raopcld->ctx, buf, buf);
-		memcpy(raopcld->nv,buf,16);
-		i+=16;
+		memcpy(raopcld->nv, buf, 16);
+		i += 16;
 	}
 
-	INFO("Done encrypting data\n");
+	ERRR("Done encrypting data (i: %d\n", i);
 
 	return i;
 }
@@ -106,7 +108,7 @@ static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 	rb = lb - blen + 1;
 
 	dval = (int)d;
-	// DEBG("**p: 0x%x d: 0x%x blen: %d *bpos: %d\n", **p, dval, blen, *bpos);
+	DEBG("**p: 0x%x d: 0x%x blen: %d *bpos: %d\n", **p, dval, blen, *bpos);
 
 	if (rb >= 0) {
 		bd = d << rb;
@@ -125,8 +127,6 @@ static inline void bits_write(uint8_t **p, uint8_t d, int blen, int *bpos)
 	}
 }
 
-#define USE_AUDS_WRITE
-#ifdef USE_AUDS_WRITE
 static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 			  int bsize, data_source_t *ds)
 {
@@ -152,11 +152,12 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	bits_write(&bp,0,2,&bpos); // unused
 	bits_write(&bp,1,1,&bpos); // is-not-compressed
 
-	DEBG("orig_bp: %p bp: %p bp - orig_bp: 0x%x orig_bp as hex: 0x%x\n",
+	ERRR("orig_bp: %p bp: %p bp - orig_bp: 0x%x orig_bp as hex: 0x%x bpos: %d\n",
 	     (void *)orig_bp,
 	     (void *)bp,
 	     (int)(bp - orig_bp),
-	     (short)*orig_bp);
+	     (short)*orig_bp,
+	     bpos);
 
 	while (1) {
 		if (ds->u.mem.size <= count*4) {
@@ -201,7 +202,7 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	*data = buffer;
 	return 0;
 }
-#endif /* #ifdef USE_AUDS_WRITE */
+
 
 static int aud_clac_chunk_size(int sample_rate)
 {
@@ -283,8 +284,6 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 	uint8_t *rbuf=NULL;
 	size_t bytes_read;
 	static int total_read = 0;
-	char bits[128];
-	uint8_t *displayp;
 
 	INFO("Preparing to get next PCM audio sample (fd: %d\n", pcm->dfd);
 
@@ -314,33 +313,9 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 
 	ds.u.mem.data=(int16_t*)rbuf;
 	bsize=ds.u.mem.size/4;
-#ifdef USE_AUDS_WRITE
+
+	ERRR("size: %d\n", *size);
 	rval=auds_write_pcm(pcm->buffer, data, size, bsize, &ds);
-#else /* #ifdef USE_AUDS_WRITE */
-	*(short *)pcm->buffer = (short)0x20;
-	DEBG("data: %p size: %d ds.u.mem.size: %d encoded_buf: 0x%x\n",
-	     (void *)data, *size, ds.u.mem.size, (short)*(pcm->buffer));
-
-	for (int i = 0 ; i < ds.u.mem.size ; i += 1) {
-		//*(pcm->buffer + i + 2) = syscalls_htons(*(rbuf + i));
-		*(pcm->buffer + i + 2) = *(rbuf + i);
-	}
-#endif /* #ifdef USE_AUDS_WRITE */
-
-	displayp = pcm->buffer;
-	DEBG("buf: 0x%x 0x%x 0x%x\n",
-	     (unsigned int)*displayp,
-	     (unsigned int)*(displayp + 1),
-	     (unsigned int)*(displayp + 2));
-
-	DEBG("Starting bit dump\n");
-	/* Let's spit out the bitfields and see what they are: */
-	for (int i = 0 ; i < 8 ; i++) {
-		uint32_t *bitp;
-		bitp = ((uint32_t *)pcm->buffer) + i;
-		bits_to_string(*bitp, sizeof(*bitp) * 8, bits, sizeof(bits));
-		DEBG("bp: %s\n", bits);
-	}
 
 	free(rbuf);
 	return rval;
@@ -417,12 +392,12 @@ static int fd_event_callback(void *p, int flags)
 		return -1;
 	}
 
-	INFO("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
+	ERRR("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
 	i = syscalls_write(raopcld->sfd,
 			   raopcld->data + raopcld->wblk_wsize,
 			   raopcld->wblk_remsize);
 
-	DEBG("write to %d returned %d\n", raopcld->sfd, i);
+	ERRR("write to %d returned %d\n", raopcld->sfd, i);
 
 	if(i<0){
 		ERRR("%s: write error: %s\n", __func__, strerror(errno));
@@ -443,7 +418,7 @@ static int fd_event_callback(void *p, int flags)
 }
 
 
-static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count )
+static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 {
 	int rval=-1;
 	uint16_t len;
@@ -459,7 +434,7 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count )
 	const int header_size=sizeof(header);
 	raopcl_data_t *raopcld;
 
-	INFO("Preparing to send audio sample\n");
+	ERRR("Preparing to send audio sample (count: %d)\n", count);
 
 	if (!p) return -1;
 
@@ -475,7 +450,7 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count )
 
 	memcpy(raopcld->data,header,header_size);
 	len=count+header_size-4;
-	DEBG("len: %d\n", len);
+	ERRR("reported len: %d\n", len);
 
 	raopcld->data[2]=len>>8;
 	raopcld->data[3]=len&0xff;
@@ -701,8 +676,6 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 
 	raopcl = (raopcl_data_t *)raopld->raopcl;
 	raopcl->sfd = session_fd;
-
-	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_DEBUG);
 
 	rval=0;
 	while(!rval){

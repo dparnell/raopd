@@ -30,7 +30,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/time.h>
 #include <arpa/inet.h>
 
-int syscalls_open(const char *pathname, int flags);
+int syscalls_open(const char *pathname, int flags, mode_t mode);
 int syscalls_close(int fd);
 
 int syscalls_vsnprintf(char *str, size_t size, const char *format, va_list args);

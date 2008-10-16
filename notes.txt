@@ -1,3 +1,7 @@
+The conversion process is deterministic; I saw no reason that it
+should not be, but confirmed it by writing the output to a set of
+files and comparing them over several runs.
+
 raop_play_send_audio.c:329 pcm_get_ Starting bit dump
 
 _audio.c:335 pcm_get_ bp: 00000000 00010010 00000000 00100000
