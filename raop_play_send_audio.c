@@ -31,6 +31,10 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 static raopld_t *raopld;
 
+int raop_play_completefd = -1;
+int raop_play_pcmfd = -1;
+int raop_play_convertedfd = -1;
+
 /*
  * if newsize < 4096, align the size to power of 2
  */
@@ -57,6 +61,8 @@ static inline int realloc_memory(void **p, int newsize, const char *func)
 }
 
 
+#define USE_RAOPD_ENCRYPTION
+#ifndef USE_RAOPD_ENCRYPTION
 static int encrypt(raopcl_data_t *raopcld, uint8_t *data, int size)
 {
 	uint8_t *buf;
@@ -80,7 +86,7 @@ static int encrypt(raopcl_data_t *raopcld, uint8_t *data, int size)
 
 	return i;
 }
-
+#endif
 
 static int pcm_close(auds_t *auds)
 {
@@ -137,7 +143,7 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 	int i,nodata=0;
 	static uint8_t *orig_bp = NULL;
 
-	DEBG("Manipulating PCM data (size: %d bsize: %d)\n", *size, bsize);
+	ERRR("Manipulating PCM data (size: %d bsize: %d)\n", *size, bsize);
 
 	/* This looks like a header for the data block.  I would think
 	 * it would be fairly easy to create a struct for the
@@ -307,6 +313,10 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 		return -1;
 	}
 
+	syscalls_write(raop_play_pcmfd,
+		       rbuf,
+		       bytes_read);
+
 	if (ds.u.mem.size < MINIMUM_SAMPLE_SIZE * 4) {
 		ds.u.mem.size = MINIMUM_SAMPLE_SIZE * 4;
 	}
@@ -374,7 +384,7 @@ static int fd_event_callback(void *p, int flags)
 
 			raopcld->size_in_aex=rsize;
 			syscalls_gettimeofday(&raopcld->last_read_tv,NULL);
-			DEBG("%s: read %d bytes, rsize=%d\n", __func__, i,rsize);
+			ERRR("%s: read %d bytes, rsize=%d\n", __func__, i,rsize);
 			return 0;
 		}
 		if(i<0) ERRR("%s: read error: %s\n", __func__, strerror(errno));
@@ -396,6 +406,10 @@ static int fd_event_callback(void *p, int flags)
 	i = syscalls_write(raopcld->sfd,
 			   raopcld->data + raopcld->wblk_wsize,
 			   raopcld->wblk_remsize);
+
+	syscalls_write(raop_play_completefd,
+		       raopcld->data + raopcld->wblk_wsize,
+		       i);
 
 	ERRR("write to %d returned %d\n", raopcld->sfd, i);
 
@@ -431,6 +445,12 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 
 	uint8_t **datap;
 
+#ifdef USE_RAOPD_ENCRYPTION
+	uint8_t *encrypted_buffer;
+	size_t encrypted_len;
+	struct aes_data aes_data;
+#endif
+
 	const int header_size=sizeof(header);
 	raopcl_data_t *raopcld;
 
@@ -456,7 +476,21 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 	raopcld->data[3]=len&0xff;
 	memcpy(raopcld->data+header_size,sample,count);
 
+#ifndef USE_RAOPD_ENCRYPTION
 	encrypt(raopcld, raopcld->data+header_size, count);
+#else
+	memcpy(&aes_data.key, raopcld->key, RAOP_AES_KEY_LEN);
+	memcpy(&aes_data.iv, raopcld->iv, RAOP_AES_IV_LEN);
+	initialize_aes(&aes_data);
+	encrypted_buffer = malloc(1024 * 32);
+	aes_encrypt_data(&aes_data,
+			 encrypted_buffer,
+			 &encrypted_len,
+			 raopcld->data + header_size,
+			 count);
+	memcpy(raopcld->data + header_size, encrypted_buffer, count);
+	free(encrypted_buffer);
+#endif
 
 	len=count+header_size;
 	DEBG("encrypted len: %d\n", len);
@@ -665,6 +699,13 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 	int pcm_datafile_open = 0;
 
 	INFO("PCM audio file: \"%s\" session_fd: %d\n", pcm_audio_file, session_fd);
+
+	raop_play_completefd = open("audio_debug/raop_play.complete.out",
+			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	raop_play_pcmfd = open("audio_debug/raop_play.pcm.out",
+			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	raop_play_convertedfd = open("audio_debug/raop_play.converted.out",
+			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 
 	raopld = syscalls_malloc(sizeof(*raopld));
 	for (i = 0 ; i < MAX_NUM_OF_FDS ; i++) {
