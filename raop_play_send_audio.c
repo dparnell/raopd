@@ -61,32 +61,6 @@ static inline int realloc_memory(void **p, int newsize, const char *func)
 }
 
 
-#define USE_RAOPD_ENCRYPTION
-#ifndef USE_RAOPD_ENCRYPTION
-static int encrypt(raopcl_data_t *raopcld, uint8_t *data, int size)
-{
-	uint8_t *buf;
-	int i = 0, j;
-
-	ERRR("Encrypting data (size: %d)\n", size);
-
-	memcpy(raopcld->nv, raopcld->iv, 16);
-
-	while (i + 16 <= size) {
-		buf = data + i;
-		for (j = 0 ; j < 16 ; j++) {
-			buf[j] ^= raopcld->nv[j];
-		}
-		aes_encrypt(&raopcld->ctx, buf, buf);
-		memcpy(raopcld->nv, buf, 16);
-		i += 16;
-	}
-
-	ERRR("Done encrypting data (i: %d\n", i);
-
-	return i;
-}
-#endif
 
 static int pcm_close(auds_t *auds)
 {
@@ -445,11 +419,9 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 
 	uint8_t **datap;
 
-#ifdef USE_RAOPD_ENCRYPTION
 	uint8_t *encrypted_buffer;
 	size_t encrypted_len;
 	struct aes_data aes_data;
-#endif
 
 	const int header_size=sizeof(header);
 	raopcl_data_t *raopcld;
@@ -476,9 +448,6 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 	raopcld->data[3]=len&0xff;
 	memcpy(raopcld->data+header_size,sample,count);
 
-#ifndef USE_RAOPD_ENCRYPTION
-	encrypt(raopcld, raopcld->data+header_size, count);
-#else
 	memcpy(&aes_data.key, raopcld->key, RAOP_AES_KEY_LEN);
 	memcpy(&aes_data.iv, raopcld->iv, RAOP_AES_IV_LEN);
 	initialize_aes(&aes_data);
@@ -490,7 +459,6 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 			 count);
 	memcpy(raopcld->data + header_size, encrypted_buffer, count);
 	free(encrypted_buffer);
-#endif
 
 	len=count+header_size;
 	DEBG("encrypted len: %d\n", len);
@@ -675,7 +643,6 @@ static raopcl_t *raopcl_open(struct aes_data *aes_data)
 
 	memcpy(raopcld->nv,raopcld->iv,sizeof(raopcld->nv));
 	raopcld->volume = VOLUME_DEF;
-        aes_set_key(&raopcld->ctx, raopcld->key, 128);
 
 	return (raopcl_t *)raopcld;
 }

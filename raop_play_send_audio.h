@@ -22,7 +22,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include <samplerate.h>
 
 #include "encryption.h"
-#include "aes.h"
 
 #define MAIN_EVENT_TIMEOUT 3 // sec unit
 
@@ -136,7 +135,6 @@ typedef struct raopcl_data_t {
 	int wblk_remsize;
 	pause_state_t pause;
 	int wait_songdone;
-	aes_context ctx;
 	uint8_t *data;
 	uint8_t min_sdata[MINIMUM_SAMPLE_SIZE*4+16];
 	int min_sdata_size;
