@@ -164,6 +164,29 @@ unsigned int syscalls_sleep(unsigned int seconds)
 	return ret;
 }
 
+unsigned int syscalls_usleep(unsigned int usec)
+{
+	unsigned int ret;
+
+	ret = usleep(usec);
+	if (0 != ret) {
+		switch (errno) {
+		case EINTR:
+			INFO("usleep was interrupted by a signal.\n");
+			break;
+		case EINVAL:
+			WARN("usec (%u) is not a valid number of microseconds "
+			     "to sleep (perhaps less than 1000000 which is "
+			     "invalid on this platform?\n", usec);
+		default:
+			ERRR("usleep errored: \"%s\"\n", strerror(errno));
+			break;
+		}
+	}
+
+	return ret;
+}
+
 void *syscalls_malloc(size_t size) {
 	void *ret;
 

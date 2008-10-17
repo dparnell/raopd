@@ -44,6 +44,7 @@ int syscalls_connect(int sockfd,
 ssize_t syscalls_read(int fd, void *buf, size_t count);
 ssize_t syscalls_write(int fd, const void *buf, size_t count);
 unsigned int syscalls_sleep(unsigned int seconds);
+unsigned int syscalls_usleep(unsigned int usec);
 void *syscalls_malloc(size_t size);
 void syscalls_free(void *ptr);
 void *syscalls_memset(void *s, int c, size_t n);

@@ -453,7 +453,6 @@ utility_retcode_t rtsp_send_data(struct rtsp_session *session)
 		goto out;
 	}
 
-	lt_set_level(LT_AUDIO_STREAM, LT_DEBUG);
 	send_audio_stream(&session->audio_stream,
 			  &session->aes_data);
 
