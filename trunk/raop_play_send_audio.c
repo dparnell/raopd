@@ -20,6 +20,8 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "syscalls.h"
 #include "utility.h"
@@ -234,7 +236,7 @@ static auds_t *auds_open(char *fname, data_type_t adt)
 	if (!auds) return NULL;
 	syscalls_memset(auds, 0, sizeof(auds_t));
 
-	DEBG("Opening audio file \"%s\"\n", fname);
+	INFO("Opening audio file \"%s\"\n", fname);
 
 	auds->channels=2; //default is stereo
 	auds->data_type=adt;
@@ -274,7 +276,7 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 	ds.u.mem.size = bytes_read;
 	total_read += bytes_read;
 
-	DEBG("Read %d bytes from PCM audio file (total: %d)\n",
+	INFO("Read %d bytes from PCM audio file (total: %d)\n",
 	     (int)bytes_read, total_read);
 
 	if (bytes_read == 0){
@@ -310,7 +312,7 @@ static int set_fd_event(int fd, int flags, fd_callback_t cbf, void *p)
 {
 	int i;
 
-	DEBG("fd: %d flags: 0x%x\n", fd, flags);
+	INFO("fd: %d flags: 0x%x\n", fd, flags);
 
 	// check the same fd first. if it exists, update it
 	for(i=0;i<MAX_NUM_OF_FDS;i++){
@@ -344,12 +346,12 @@ static int fd_event_callback(void *p, int flags)
 	if(!p) return -1;
 	raopcld=(raopcl_data_t *)p;
 
-	DEBG("flags: 0x%x\n", flags);
+	INFO("flags: 0x%x\n", flags);
 
 	if (flags & RAOP_FD_READ) {
 		i=syscalls_read(raopcld->sfd,buf,sizeof(buf));
 
-		DEBG("read from %d returned %d\n", raopcld->sfd, i);
+		INFO("read from %d returned %d\n", raopcld->sfd, i);
 
 		if(i>0){
 			rsize=GET_BIGENDIAN_INT(buf+0x2c);
@@ -401,7 +403,7 @@ static int fd_event_callback(void *p, int flags)
 		set_fd_event(raopcld->sfd, RAOP_FD_READ, fd_event_callback,(void*)raopcld);
 	}
 
-	DEBG("%d bytes are sent, remaining size=%d\n",i,raopcld->wblk_remsize);
+	INFO("%d bytes are sent, remaining size=%d\n",i,raopcld->wblk_remsize);
 	return 0;
 }
 
@@ -461,7 +463,7 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 	free(encrypted_buffer);
 
 	len=count+header_size;
-	DEBG("encrypted len: %d\n", len);
+	INFO("encrypted len: %d\n", len);
 
 	raopcld->wblk_remsize=count+header_size;
 	raopcld->wblk_wsize=0;
@@ -481,7 +483,7 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 	rval=0;
 
 erexit:
-	DEBG("rval: %d\n", rval);
+	INFO("rval: %d\n", rval);
 	return rval;
 }
 
@@ -490,7 +492,7 @@ static int raopcl_wait_songdone(raopcl_t *p, int set)
 {
 	raopcl_data_t *raopcld=(raopcl_data_t *)p;
 
-	DEBG("in wait song done\n");
+	INFO("in wait song done\n");
 
 	if (set) {
 		raopcld->wait_songdone = (set == 1);
@@ -505,7 +507,7 @@ static int raopcl_aexbuf_time(raopcl_t *p, struct timeval *dtv)
 	raopcl_data_t *raopcld=(raopcl_data_t *)p;
 	struct timeval ctv, atv;
 
-	DEBG("in aexbuf time\n");
+	INFO("in aexbuf time\n");
 
 	if (!p) return -1;
 
@@ -536,7 +538,7 @@ static int raopcl_aexbuf_time(raopcl_t *p, struct timeval *dtv)
 		memset(dtv, 0, sizeof(struct timeval));
 	}
 
-	DEBG("%s:tv_sec=%d, tv_usec=%d\n",__func__,(int)dtv->tv_sec,(int)dtv->tv_usec);
+	INFO("%s:tv_sec=%d, tv_usec=%d\n",__func__,(int)dtv->tv_sec,(int)dtv->tv_usec);
 
 	return 0;
 }
@@ -549,7 +551,7 @@ static int main_event_handler()
 	int i;
 	struct timeval tout={.tv_sec=MAIN_EVENT_TIMEOUT, .tv_usec=0};
 
-	DEBG("in main event handler\n");
+	INFO("in main event handler\n");
 
 	FD_ZERO(&rdfds);
 	FD_ZERO(&wrfds);
@@ -560,12 +562,12 @@ static int main_event_handler()
 		}
 
 		if (raopld->fds[i].flags & RAOP_FD_READ) {
-			DEBG("Adding fd %d to read set\n", raopld->fds[i].fd);
+			INFO("Adding fd %d to read set\n", raopld->fds[i].fd);
 			FD_SET(raopld->fds[i].fd, &rdfds);
 		}
 
 		if (raopld->fds[i].flags & RAOP_FD_WRITE) {
-			DEBG("Adding fd %d to write set\n", raopld->fds[i].fd);
+			INFO("Adding fd %d to write set\n", raopld->fds[i].fd);
 			FD_SET(raopld->fds[i].fd, &wrfds);
 		}
 
@@ -585,7 +587,7 @@ static int main_event_handler()
 
 		if ((raopld->fds[i].flags & RAOP_FD_READ) &&
 		    FD_ISSET(raopld->fds[i].fd, &rdfds)) {
-			DEBG("rd event i=%d, flags=%d\n",i,raopld->fds[i].flags);
+			INFO("rd event i=%d, flags=%d\n",i,raopld->fds[i].flags);
 			if (raopld->fds[i].cbf &&
 			    raopld->fds[i].cbf(raopld->fds[i].dp, RAOP_FD_READ)) {
 				return -1;
@@ -594,7 +596,7 @@ static int main_event_handler()
 
 		if((raopld->fds[i].flags&RAOP_FD_WRITE) &&
 		   FD_ISSET(raopld->fds[i].fd,&wrfds)){
-			DEBG("wr event i=%d, flags=%d\n",i,raopld->fds[i].flags);
+			INFO("wr event i=%d, flags=%d\n",i,raopld->fds[i].flags);
 			if(raopld->fds[i].cbf &&
 			   raopld->fds[i].cbf(raopld->fds[i].dp, RAOP_FD_WRITE)) return -1;
 		}
@@ -604,7 +606,7 @@ static int main_event_handler()
 		raopcl_aexbuf_time(raopld->raopcl, &tout);
 		if(!tout.tv_sec && !tout.tv_usec){
 			// AEX data buffer becomes empty, it means end of playing a song.
-			DEBG("%s\n",RAOP_SONGDONE);
+			INFO("%s\n",RAOP_SONGDONE);
 			fflush(stdout);
 			raopcl_wait_songdone(raopld->raopcl,-1); // clear wait_songdone
 		}
@@ -623,7 +625,7 @@ static raopcl_t *raopcl_open(struct aes_data *aes_data)
 	raopcld=syscalls_malloc(sizeof(raopcl_data_t));
 	memset(raopcld, 0, sizeof(raopcl_data_t));
 
-	DEBG("sizeof(raopcld->iv): %d sizeof(aes_data->iv): %d\n",
+	INFO("sizeof(raopcld->iv): %d sizeof(aes_data->iv): %d\n",
 	     sizeof(raopcld->iv), sizeof(aes_data->iv));
 
 	if (sizeof(raopcld->iv) != sizeof(aes_data->iv)) {
@@ -632,7 +634,7 @@ static raopcl_t *raopcl_open(struct aes_data *aes_data)
 	}
 	syscalls_memcpy(raopcld->iv, aes_data->iv, sizeof(raopcld->iv));
 
-	DEBG("sizeof(raopcld->key): %d sizeof(aes_data->key): %d\n",
+	INFO("sizeof(raopcld->key): %d sizeof(aes_data->key): %d\n",
 	     sizeof(raopcld->key), sizeof(aes_data->key));
 
 	if (sizeof(raopcld->key) != sizeof(aes_data->key)) {
@@ -664,15 +666,28 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 	raopcl_data_t *raopcl;
 	int i;
 	int pcm_datafile_open = 0;
+	char complete_out[64], pcm_out[64], converted_out[64];
+	int pid;
 
 	INFO("PCM audio file: \"%s\" session_fd: %d\n", pcm_audio_file, session_fd);
 
-	raop_play_completefd = open("audio_debug/raop_play.complete.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	raop_play_pcmfd = open("audio_debug/raop_play.pcm.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	raop_play_convertedfd = open("audio_debug/raop_play.converted.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	pid = syscalls_getpid();
+
+	snprintf(complete_out,
+		 sizeof(complete_out),
+		 "audio_debug/raop_play.complete.out.%d", pid);
+	raop_play_completefd = open(complete_out,
+				    O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	snprintf(pcm_out,
+		 sizeof(pcm_out),
+		 "audio_debug/raop_play.pcm.out.%d", pid);
+	raop_play_pcmfd = open(pcm_out,
+			       O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	snprintf(converted_out,
+		 sizeof(converted_out),
+		 "audio_debug/raop_play.converted.out.%d", pid);
+	raop_play_convertedfd = open(converted_out,
+				     O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 
 	raopld = syscalls_malloc(sizeof(*raopld));
 	for (i = 0 ; i < MAX_NUM_OF_FDS ; i++) {
@@ -709,4 +724,30 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 	}
 
 	return 0;
+}
+
+
+void test_audio(void)
+{
+	struct aes_data aes_data;
+	char pcm_testdata[] = "pcm_testfile";
+	int session_fd;
+
+	CRIT("Testing audio send routines; no connections "
+	     "will be made to the server\n");
+
+	generate_aes_data(&aes_data);
+
+	session_fd = syscalls_open("./fake_session",
+				   O_RDWR, S_IRUSR | S_IWUSR);
+
+	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_INFO);
+
+	hacked_send_audio(pcm_testdata,
+			  session_fd,
+			  &aes_data);
+
+	CRIT("Audio test done; exiting\n");
+
+	exit (1);
 }

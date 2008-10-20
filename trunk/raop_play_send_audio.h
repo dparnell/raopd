@@ -159,3 +159,4 @@ typedef struct raopld_t{
 }raopld_t;
 
 int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes_data);
+void test_audio(void);
