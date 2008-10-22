@@ -67,11 +67,11 @@ struct audio_stream {
 
 #ifdef USE_RAOP_PLAY_CODE
 
-#define send_audio_stream raop_play_send_audio_stream
+#define send_audio_stream_internal raop_play_send_audio_stream
 
 #else /* #ifdef USE_RAOP_PLAY_CODE */
 
-#define send_audio_stream raopd_send_audio_stream
+#define send_audio_stream_internal raopd_send_audio_stream
 
 #endif /* #ifdef USE_RAOP_PLAY_CODE */
 
@@ -80,8 +80,10 @@ utility_retcode_t raop_play_send_audio_stream(struct audio_stream *audio_stream,
 					      struct aes_data *aes_data);
 utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 					  struct aes_data *aes_data);
+utility_retcode_t send_audio_stream(struct audio_stream *audio_stream,
+				    struct aes_data *aes_data);
 
-#define convert_audio_data raop_play_convert_audio_data
+utility_retcode_t convert_audio_data(struct audio_stream *audio_stream);
 utility_retcode_t raop_play_convert_audio_data(struct audio_stream *audio_stream);
 utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream);
 

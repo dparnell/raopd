@@ -85,7 +85,8 @@ typedef enum {
 	LT_ENCODING_POSITION,
 	LT_ENCRYPTION_POSITION,
 	LT_RAOP_PLAY_SEND_AUDIO_POSITION,
-	LT_AUDIO_STREAM_POSITION
+	LT_AUDIO_STREAM_POSITION,
+	LT_AUDIO_DEBUG_POSITION
 } lt_facility_position_t;
 
 typedef uint64_t lt_mask_t;
@@ -104,6 +105,7 @@ typedef uint64_t lt_mask_t;
 #define LT_ENCRYPTION		(((lt_mask_t)0x1) << LT_ENCRYPTION_POSITION)
 #define LT_RAOP_PLAY_SEND_AUDIO	(((lt_mask_t)0x1) << LT_RAOP_PLAY_SEND_AUDIO_POSITION)
 #define LT_AUDIO_STREAM		(((lt_mask_t)0x1) << LT_AUDIO_STREAM_POSITION)
+#define LT_AUDIO_DEBUG		(((lt_mask_t)0x1) << LT_AUDIO_DEBUG_POSITION)
 
 #define LT_DEFAULT_MASK		(((lt_mask_t)(~0)) ^ LT_FUNCTION_CALLS)
 #define LT_DEFAULT_LEVEL	LT_WARNING
