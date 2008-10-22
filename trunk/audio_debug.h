@@ -16,34 +16,18 @@ for more details.
 You should have received a copy of the GNU General Public License
 along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "lt.h"
-#include "utility.h"
-#include "syscalls.h"
-#include "client.h"
-#include "rtsp_client.h"
-#include "raop_play_send_audio.h"
+#ifndef AUDIO_DEBUG_H
+#define AUDIO_DEBUG_H
 
-#define DEFAULT_FACILITY LT_MAIN
+utility_retcode_t compare_audio_data(uint8_t *buf1,
+				     size_t buf1_size,
+				     uint8_t *buf2,
+				     size_t buf2_size);
+utility_retcode_t open_audio_dump_files(void);
+utility_retcode_t dump_raw_pcm(uint8_t *buf, size_t size);
+utility_retcode_t dump_converted(uint8_t *buf, size_t size);
+utility_retcode_t dump_encrypted(uint8_t *buf, size_t size);
+utility_retcode_t dump_complete_raopd(uint8_t *buf, size_t size);
+utility_retcode_t dump_complete_raop_play(uint8_t *buf, size_t size);
 
-
-int main(void)
-{
-	struct rtsp_session session;
-
-	/* We can't output anything to the user until the lt framework
-	 * is initialized, so do that before anything else. */
-	lt_init();
-	FUNC_ENTER;
-
-	NOTC("raopd starting\n");
-
-	if (UTILITY_SUCCESS == rtsp_start_client(&session)) {
-		rtsp_send_data(&session);
-	}
-
-	NOTC("raopd exiting\n");
-
-	FUNC_RETURN;
-	return 0;
-}
-
+#endif /* #ifndef AUDIO_DEBUG_H */

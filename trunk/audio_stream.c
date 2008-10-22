@@ -22,15 +22,9 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "lt.h"
 #include "audio_stream.h"
 #include "raop_play_send_audio.h"
+#include "audio_debug.h"
 
 #define DEFAULT_FACILITY LT_AUDIO_STREAM
-
-
-int completefd1 = -1;
-int completefd2 = -1;
-int rawpcmfd = -1;
-int convertedfd = -1;
-int encryptedfd = -1;
 
 utility_retcode_t init_audio_stream(struct audio_stream *audio_stream)
 {
@@ -164,18 +158,16 @@ static utility_retcode_t read_audio_data(struct audio_stream *audio_stream)
 		goto out;
 	}
 
-	syscalls_write(rawpcmfd,
-		       audio_stream->pcm_buf,
-		       read_ret);
-
 	audio_stream->pcm_len = read_ret;
 
 	audio_stream->pcm_num_samples_read =
 		audio_stream->pcm_len / PCM_BYTES_PER_SAMPLE;
 
-	DEBG("Read %d bytes of pcm data (%d samples)\n",
+	INFO("Read %d bytes of pcm data (%d samples)\n",
 	     (int)audio_stream->pcm_len,
 	     (int)audio_stream->pcm_num_samples_read);
+
+	dump_raw_pcm(audio_stream->pcm_buf, audio_stream->pcm_len);
 
 	if (0 == read_ret) {
 		DEBG("Finished reading PCM data file \"%s\"\n",
@@ -188,111 +180,19 @@ out:
 }
 
 
-/* write bits filed data, *bpos=0 for msb, *bpos=7 for lsb
-   d=data, blen=length of bits field
- */
-static inline void bits_write_copy(uint8_t **p, uint8_t d, int blen, int *bpos)
+utility_retcode_t convert_audio_data(struct audio_stream *audio_stream)
 {
-	int8_t lb, rb, bd;
-	int dval;
+	utility_retcode_t ret = UTILITY_SUCCESS;
 
-	/* leftmost bit is 7 - position */
-	lb = 7 - *bpos;
-	/* rightmost bit is left bit - length - 1 */
-	rb = lb - blen + 1;
+	INFO("Converting %d samples (%d bytes) to bigendian order\n",
+	     audio_stream->pcm_num_samples_read, audio_stream->pcm_len);
 
-	dval = (int)d;
-	DEBG("**p: 0x%x d: 0x%x blen: %d *bpos: %d\n", **p, dval, blen, *bpos);
-
-	if (rb >= 0) {
-		bd = d << rb;
-		if (*bpos) {
-			**p |= bd;
-		} else {
-			**p = bd;
-		}
-		*bpos += blen;
-	} else {
-		bd = d >> (-rb);
-		**p |= bd;
-		*p += 1;
-		**p = d << (8 + rb);
-		*bpos = (-rb);
-	}
-}
-
-
-utility_retcode_t raop_play_convert_audio_data(struct audio_stream *audio_stream)
-{
-	uint8_t one[4];
-	int count = 0;
-	int bpos = 0;
-	uint8_t *bp = audio_stream->pcm_buf;
-	int i, nodata = 0;
-	static uint8_t *orig_bp = NULL;
-	int bsize = 4096;
-
-	/* This looks like a header for the data block.  I would think
-	 * it would be fairly easy to create a struct for the
-	 * bitfields and set them that way, rather than bit by bit. */
-	orig_bp = bp;
-
-	bits_write_copy(&bp,1,3,&bpos); // channel=1, stereo
-	bits_write_copy(&bp,0,4,&bpos); // unknown
-	bits_write_copy(&bp,0,8,&bpos); // unknown
-	bits_write_copy(&bp,0,4,&bpos); // unknown
-	bits_write_copy(&bp,0,1,&bpos); // hassize
-	bits_write_copy(&bp,0,2,&bpos); // unused
-	bits_write_copy(&bp,1,1,&bpos); // is-not-compressed
-
-	ERRR("orig_bp: %p bp: %p bp - orig_bp: 0x%x orig_bp as hex: 0x%x bpos: %d\n",
-	     (void *)orig_bp,
-	     (void *)bp,
-	     (int)(bp - orig_bp),
-	     (short)*orig_bp,
-	     bpos);
-
-	while (1) {
-		if (audio_stream->pcm_len <= (size_t)(count * 4)) {
-			nodata = 1;
-		}
-
-		*((int16_t*)one) = audio_stream->pcm_buf[count * 2];
-		*((int16_t*)one+1) = audio_stream->pcm_buf[count * 2 + 1];
-
-		if (nodata) {
-			break;
-		}
-
-		/* Is this code just reversing the byte order of the
-		 * PCM data, i.e., on Intel architectures, converting
-		 * it to network byte order?  */
-		bits_write_copy(&bp,one[1],8,&bpos);
-		bits_write_copy(&bp,one[0],8,&bpos);
-		bits_write_copy(&bp,one[3],8,&bpos);
-		bits_write_copy(&bp,one[2],8,&bpos);
-
-		if (++count == bsize) {
-			break;
-		}
+	ret = raopd_convert_audio_data(audio_stream);
+	if (UTILITY_SUCCESS != ret) {
+		ERRR("Failed to convert audio data\n");
 	}
 
-	if (!count) {
-		/* when no data at all, it should stop playing */
-		return UTILITY_FAILURE;
-	}
-
-	/* when readable size is less than bsize, fill 0 at the bottom */
-	for (i = 0 ; i < ((bsize - count) * 4) ; i++) {
-		bits_write_copy(&bp,0,8,&bpos);
-	}
-
-	audio_stream->converted_len = (bp - audio_stream->pcm_buf);
-	if (bpos) {
-		audio_stream->converted_len += 1;
-	}
-
-	return UTILITY_SUCCESS;
+	return ret;
 }
 
 
@@ -303,7 +203,8 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	int i;
 
 	/* These statements set the bitfields in the first 3 bytes of
-	 * the audio buffer. */
+	 * the audio buffer.  It would be better to do this with a
+	 * struct. */
 	*audio_stream->converted_buf = 0x20;
 	*(audio_stream->converted_buf + 1) = 0x0;
 	*(audio_stream->converted_buf + 2) = 0x2;
@@ -311,8 +212,6 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	readp = audio_stream->pcm_buf;
 	writep = (audio_stream->converted_buf + 3);
 
-	DEBG("Converting %d samples (%d bytes) to bigendian order\n",
-	     audio_stream->pcm_num_samples_read, audio_stream->pcm_len);
 	/* We want big-endian samples; this logic assumes that the
 	 * input PCM data is little-endian. */
 	for (i = 0 ; i < (int)audio_stream->pcm_num_samples_read ; i++) {
@@ -324,7 +223,7 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	}
 
 	writep = audio_stream->converted_buf + 3;
-	DEBG("Bit-shifting %d bytes\n", audio_stream->pcm_len);
+	INFO("Bit-shifting %d bytes\n", audio_stream->pcm_len);
 	/* Bit-shift everything left one bit across the byte boundary. (?!?) */
 	for (i = 0 ; i < (int)(audio_stream->pcm_len) ; i++) {
 		msb = (*writep) >> 7;
@@ -335,8 +234,7 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 
 	audio_stream->converted_len = audio_stream->pcm_len + 3;
 
-	syscalls_write(convertedfd,
-		       audio_stream->converted_buf,
+	dump_converted(audio_stream->converted_buf,
 		       audio_stream->converted_len);
 
 	return UTILITY_SUCCESS;
@@ -358,8 +256,7 @@ static utility_retcode_t encrypt_audio_data(struct audio_stream *audio_stream,
 	INFO("Encrypted %d bytes of audio data (encrypted length: %d)\n",
 	     audio_stream->converted_len, audio_stream->encrypted_len);
 
-	syscalls_write(encryptedfd,
-		       audio_stream->encrypted_buf,
+	dump_encrypted(audio_stream->encrypted_buf,
 		       audio_stream->encrypted_len);
 
 	return UTILITY_SUCCESS;
@@ -372,9 +269,8 @@ static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
 	int retries = 0, write_ret;
 	size_t written = 0;
 
-	syscalls_write(completefd1,
-		       audio_stream->transmit_buf + written,
-		       audio_stream->transmit_len - written);
+	dump_complete_raopd(audio_stream->transmit_buf + written,
+			    audio_stream->transmit_len - written);
 
 	while (written <  audio_stream->transmit_len &&
 	       retries < AUDIO_WRITE_RETRIES) {
@@ -389,10 +285,6 @@ static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
 					   audio_stream->transmit_len - written);
 
 		if (write_ret > 0) {
-
-			syscalls_write(completefd2,
-				       audio_stream->transmit_buf + written,
-				       write_ret);
 
 			audio_stream->bytes_transmitted += write_ret;
 			written += write_ret;
@@ -493,18 +385,9 @@ utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 
 	FUNC_ENTER;
 
-	DEBG("Starting to send audio stream\n");
+	lt_set_level(LT_AUDIO_STREAM, LT_INFO);
 
-	completefd1 = open("audio_debug/complete1.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	completefd2 = open("audio_debug/complete2.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	rawpcmfd = open("audio_debug/raw_pcm.out",
-			O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	convertedfd = open("audio_debug/converted.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	encryptedfd = open("audio_debug/encrypted.pcm.out",
-			   O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	DEBG("Starting to send audio stream\n");
 
 	ret = initialize_aes(aes_data);
 	if (UTILITY_SUCCESS != ret) {
@@ -557,3 +440,10 @@ out:
 	return ret;
 }
 
+
+utility_retcode_t send_audio_stream(struct audio_stream *audio_stream,
+				    struct aes_data *aes_data)
+{
+	open_audio_dump_files();
+	return send_audio_stream_internal(audio_stream, aes_data);
+}

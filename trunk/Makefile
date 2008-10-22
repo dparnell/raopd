@@ -13,6 +13,7 @@ RAOPD_OBJS += rtsp_client.o
 RAOPD_OBJS += sdp.o
 RAOPD_OBJS += audio_stream.o
 RAOPD_OBJS += raop_play_send_audio.o
+RAOPD_OBJS += audio_debug.o
 
 RAOPD_HEADERS += *.h
 

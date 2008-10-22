@@ -28,14 +28,11 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "lt.h"
 #include "rtsp.h"
 #include "raop_play_send_audio.h"
+#include "audio_debug.h"
 
 #define DEFAULT_FACILITY LT_RAOP_PLAY_SEND_AUDIO
 
 static raopld_t *raopld;
-
-int raop_play_completefd = -1;
-int raop_play_pcmfd = -1;
-int raop_play_convertedfd = -1;
 
 /*
  * if newsize < 4096, align the size to power of 2
@@ -181,6 +178,10 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 		*size += 1;
 	}
 
+	dump_converted(buffer, *size);
+
+	INFO("Converted length %d\n", *size);
+
 	*data = buffer;
 	return 0;
 }
@@ -192,6 +193,9 @@ static int aud_clac_chunk_size(int sample_rate)
 	int ratio=DEFAULT_SAMPLE_RATE*100/sample_rate;
 	// to make suer the resampled size is <= 4096
 	if(ratio>100) bsize=bsize*100/ratio-1;
+
+	INFO("Audio chunk size: %d\n", bsize);
+
 	return bsize;
 }
 
@@ -289,9 +293,7 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 		return -1;
 	}
 
-	syscalls_write(raop_play_pcmfd,
-		       rbuf,
-		       bytes_read);
+	dump_raw_pcm(rbuf, bytes_read);
 
 	if (ds.u.mem.size < MINIMUM_SAMPLE_SIZE * 4) {
 		ds.u.mem.size = MINIMUM_SAMPLE_SIZE * 4;
@@ -301,6 +303,8 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 	bsize=ds.u.mem.size/4;
 
 	ERRR("size: %d\n", *size);
+	/* ds is a local that gets rbuf as one of its fields; output
+	 * of auds_write_pcm goes to pcm->buffer */
 	rval=auds_write_pcm(pcm->buffer, data, size, bsize, &ds);
 
 	free(rbuf);
@@ -378,22 +382,20 @@ static int fd_event_callback(void *p, int flags)
 		return -1;
 	}
 
-	ERRR("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
+	INFO("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
 	i = syscalls_write(raopcld->sfd,
 			   raopcld->data + raopcld->wblk_wsize,
 			   raopcld->wblk_remsize);
 
-	syscalls_write(raop_play_completefd,
-		       raopcld->data + raopcld->wblk_wsize,
-		       i);
+	dump_complete_raop_play(raopcld->data + raopcld->wblk_wsize, i);
 
-	ERRR("write to %d returned %d\n", raopcld->sfd, i);
+	INFO("write to %d returned %d\n", raopcld->sfd, i);
 
-	if(i<0){
+	if (i < 0) {
 		ERRR("%s: write error: %s\n", __func__, strerror(errno));
 		return -1;
 	}
-	if(i==0){
+	if (i == 0) {
 		INFO("%s: write, disconnected on the other end\n", __func__);
 		return -1;
 	}
@@ -666,28 +668,8 @@ int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes
 	raopcl_data_t *raopcl;
 	int i;
 	int pcm_datafile_open = 0;
-	char complete_out[64], pcm_out[64], converted_out[64];
-	int pid;
 
 	INFO("PCM audio file: \"%s\" session_fd: %d\n", pcm_audio_file, session_fd);
-
-	pid = syscalls_getpid();
-
-	snprintf(complete_out,
-		 sizeof(complete_out),
-		 "audio_debug/raop_play.complete.out.%d", pid);
-	raop_play_completefd = open(complete_out,
-				    O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	snprintf(pcm_out,
-		 sizeof(pcm_out),
-		 "audio_debug/raop_play.pcm.out.%d", pid);
-	raop_play_pcmfd = open(pcm_out,
-			       O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	snprintf(converted_out,
-		 sizeof(converted_out),
-		 "audio_debug/raop_play.converted.out.%d", pid);
-	raop_play_convertedfd = open(converted_out,
-				     O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 
 	raopld = syscalls_malloc(sizeof(*raopld));
 	for (i = 0 ; i < MAX_NUM_OF_FDS ; i++) {
@@ -740,8 +722,6 @@ void test_audio(void)
 
 	session_fd = syscalls_open("./fake_session",
 				   O_RDWR, S_IRUSR | S_IWUSR);
-
-	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_INFO);
 
 	hacked_send_audio(pcm_testdata,
 			  session_fd,
