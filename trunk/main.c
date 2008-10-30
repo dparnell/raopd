@@ -21,7 +21,7 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "syscalls.h"
 #include "client.h"
 #include "rtsp_client.h"
-#include "raop_play_send_audio.h"
+#include "audio_debug.h"
 
 #define DEFAULT_FACILITY LT_MAIN
 
@@ -34,6 +34,8 @@ int main(void)
 	 * is initialized, so do that before anything else. */
 	lt_init();
 	FUNC_ENTER;
+
+	test_audio();
 
 	NOTC("raopd starting\n");
 

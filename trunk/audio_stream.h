@@ -63,14 +63,16 @@ struct audio_stream {
 	size_t bytes_transmitted;
 };
 
-#define USE_RAOP_PLAY_CODE
+//#define USE_RAOP_PLAY_CODE
 
 #ifdef USE_RAOP_PLAY_CODE
 
+#define CODE_VERSION "raop_play"
 #define send_audio_stream_internal raop_play_send_audio_stream
 
 #else /* #ifdef USE_RAOP_PLAY_CODE */
 
+#define CODE_VERSION "raopd"
 #define send_audio_stream_internal raopd_send_audio_stream
 
 #endif /* #ifdef USE_RAOP_PLAY_CODE */

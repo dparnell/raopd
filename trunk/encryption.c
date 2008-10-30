@@ -142,6 +142,8 @@ utility_retcode_t initialize_aes(struct aes_data *aes_data)
 {
 	FUNC_ENTER;
 
+	INFO("Initializing AES module\n");
+
 	EVP_CIPHER_CTX_init(&aes_data->ctx);
 
 	EVP_CipherInit_ex(&aes_data->ctx,

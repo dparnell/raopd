@@ -105,28 +105,28 @@ static utility_retcode_t read_aex(int session_fd)
 
 	FUNC_ENTER;
 
-	DEBG("Before read from AEX\n");
+	INFO("Preparing to read from session fd\n");
 
 	read_ret = syscalls_read(session_fd, buf, sizeof(buf));
 
 	if (0 < read_ret) {
-		ERRR("Read %d bytes from AEX\n", ret);
+		INFO("Read %d bytes from AEX\n", ret);
 		aex_data = (uint32_t *)(buf + 0x2c);
 		rsize = syscalls_ntohl(*aex_data);
-		ERRR("rsize: %d\n", rsize);
+		INFO("Size in AEX: %d\n", rsize);
 	}
 
 	if (0 > read_ret) {
 		if (EAGAIN == errno) {
-			ERRR("Got EAGAIN from read\n");
+			DEBG("Got EAGAIN from read\n");
 		} else {
-			ERRR("Failure reading from server: %s\n", strerror(errno));
+			INFO("Failure reading from server: %s\n", strerror(errno));
 			ret = UTILITY_FAILURE;
 		}
 	}
 
 	if (0 == read_ret) {
-		ERRR("Server closed connection\n");
+		INFO("Server closed connection\n");
 		ret = UTILITY_FAILURE;
 	}
 
@@ -140,38 +140,29 @@ static utility_retcode_t read_audio_data(struct audio_stream *audio_stream)
 	utility_retcode_t ret = UTILITY_SUCCESS;
 	int read_ret;
 
-	DEBG("Attempting to read from PCM data file\n");
-
-	syscalls_memset(audio_stream->pcm_buf, 0, PCM_BUFLEN);
-	syscalls_memset(audio_stream->converted_buf, 0, CONVERTED_BUFLEN);
-	syscalls_memset(audio_stream->encrypted_buf, 0, ENCRYPTED_BUFLEN);
-	syscalls_memset(audio_stream->transmit_buf, 0, TRANSMIT_BUFLEN);
+	INFO("Preparing to get next PCM audio sample (fd: %d\n",
+	     audio_stream->pcm_fd);
 
 	read_ret = syscalls_read(audio_stream->pcm_fd,
 				 audio_stream->pcm_buf,
 				 PCM_READ_SIZE);
 
 	if (0 > read_ret) {
-		ERRR("Read from PCM data file \"%s\" failed\n",
-		     audio_stream->pcm_data_file);
+		ERRR("PCM data read failed: %s\n", strerror(errno));
 		ret = UTILITY_FAILURE;
 		goto out;
 	}
 
 	audio_stream->pcm_len = read_ret;
-
 	audio_stream->pcm_num_samples_read =
 		audio_stream->pcm_len / PCM_BYTES_PER_SAMPLE;
 
-	INFO("Read %d bytes of pcm data (%d samples)\n",
-	     (int)audio_stream->pcm_len,
-	     (int)audio_stream->pcm_num_samples_read);
+	INFO("Read %d bytes of PCM data\n", (int)audio_stream->pcm_len);
 
 	dump_raw_pcm(audio_stream->pcm_buf, audio_stream->pcm_len);
 
 	if (0 == read_ret) {
-		DEBG("Finished reading PCM data file \"%s\"\n",
-		     audio_stream->pcm_data_file);
+		INFO("Finished reading PCM data\n");
 		audio_stream->pcm_data_available = 0;
 	}
 
@@ -184,7 +175,7 @@ utility_retcode_t convert_audio_data(struct audio_stream *audio_stream)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
 
-	INFO("Converting %d samples (%d bytes) to bigendian order\n",
+	DEBG("Converting %d samples (%d bytes) to bigendian order\n",
 	     audio_stream->pcm_num_samples_read, audio_stream->pcm_len);
 
 	ret = raopd_convert_audio_data(audio_stream);
@@ -202,6 +193,9 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	uint8_t msb;
 	int i;
 
+
+	DEBG("Creating 3 byte header\n");
+
 	/* These statements set the bitfields in the first 3 bytes of
 	 * the audio buffer.  It would be better to do this with a
 	 * struct. */
@@ -211,6 +205,8 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 
 	readp = audio_stream->pcm_buf;
 	writep = (audio_stream->converted_buf + 3);
+
+	DEBG("Converting PCM data to big-endian format\n");
 
 	/* We want big-endian samples; this logic assumes that the
 	 * input PCM data is little-endian. */
@@ -223,7 +219,9 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	}
 
 	writep = audio_stream->converted_buf + 3;
-	INFO("Bit-shifting %d bytes\n", audio_stream->pcm_len);
+
+	DEBG("Bit-shifting %d bytes\n", audio_stream->pcm_len);
+
 	/* Bit-shift everything left one bit across the byte boundary. (?!?) */
 	for (i = 0 ; i < (int)(audio_stream->pcm_len) ; i++) {
 		msb = (*writep) >> 7;
@@ -233,6 +231,8 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 	}
 
 	audio_stream->converted_len = audio_stream->pcm_len + 3;
+
+	INFO("Converted PCM data is %d bytes\n", audio_stream->converted_len);
 
 	dump_converted(audio_stream->converted_buf,
 		       audio_stream->converted_len);
@@ -244,7 +244,7 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 static utility_retcode_t encrypt_audio_data(struct audio_stream *audio_stream,
 					    struct aes_data *aes_data)
 {
-	DEBG("Attempting to encrypt %d bytes of audio data\n",
+	INFO("Attempting to encrypt %d bytes of audio data\n",
 	     audio_stream->converted_len);
 
 	aes_encrypt_data(aes_data,
@@ -253,8 +253,7 @@ static utility_retcode_t encrypt_audio_data(struct audio_stream *audio_stream,
 			 audio_stream->converted_buf,
 			 audio_stream->converted_len);
 
-	INFO("Encrypted %d bytes of audio data (encrypted length: %d)\n",
-	     audio_stream->converted_len, audio_stream->encrypted_len);
+	INFO("Encrypted data length: %d\n", audio_stream->encrypted_len);
 
 	dump_encrypted(audio_stream->encrypted_buf,
 		       audio_stream->encrypted_len);
@@ -300,7 +299,7 @@ static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
 
 		if (write_ret < 0) {
 			if (EAGAIN == errno) {
-				ERRR("Got EAGAIN from write\n");
+				INFO("Got EAGAIN from write\n");
 				syscalls_usleep(100000);
 			} else {
 				ERRR("Failed to write audio data to server\n");
@@ -310,9 +309,11 @@ static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
 		}
 
 		retries++;
+
+		read_aex(audio_stream->session_fd);
 	}
 
-	ERRR("written: %d audio_stream->transmit_len: %d\n",
+	DEBG("written: %d audio_stream->transmit_len: %d\n",
 	     written, audio_stream->transmit_len);
 
 	if (retries == AUDIO_WRITE_RETRIES) {
@@ -331,7 +332,7 @@ static utility_retcode_t send_audio_data(struct audio_stream *audio_stream)
 
 	uint8_t header[] = {
 		0x24, 0x00, 0x00, 0x00,
-		0xF0, 0xFF, 0x00, 0x00,
+		0xf0, 0xff, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
         };
@@ -346,16 +347,22 @@ static utility_retcode_t send_audio_data(struct audio_stream *audio_stream)
 			audio_stream->encrypted_buf,
 			audio_stream->encrypted_len);
 
+	INFO("Copied %d bytes to transmit buffer\n",
+	     audio_stream->encrypted_len);
+
 	/* It's totally unclear why the transmit len should be 3 bytes
-	 * longer than the actual data. */
+	 * longer than the actual data--this must be related to the 3
+	 * byte header that's tacked on by the conversion, but that
+	 * should be included in the converted length.  I'm not sure
+	 * this logic is correct.  */
 	audio_stream->transmit_len = audio_stream->encrypted_len + sizeof(header) + 3;
 
 	/* The calculation of length to put into the header is
 	 * taken from the raop_play and JustePort code.  It's
 	 * not clear why the reported length in the header is
 	 * 4 bytes less than the actual length.  */
-	reported_len = audio_stream->encrypted_len + sizeof(header) - 4;
-	ERRR("reported_len: %d\n", reported_len);
+	reported_len = audio_stream->transmit_len - 4;
+	INFO("Reported length: %d\n", reported_len);
 
 	transmit_buf->header[2] = reported_len >> 8;
 	transmit_buf->header[3] = reported_len & 0xff;
@@ -377,6 +384,17 @@ utility_retcode_t raop_play_send_audio_stream(struct audio_stream *audio_stream,
 }
 
 
+static void clear_audio_buffers(struct audio_stream *audio_stream)
+{
+	syscalls_memset(audio_stream->pcm_buf, 0, PCM_BUFLEN);
+	syscalls_memset(audio_stream->converted_buf, 0, CONVERTED_BUFLEN);
+	syscalls_memset(audio_stream->encrypted_buf, 0, ENCRYPTED_BUFLEN);
+	syscalls_memset(audio_stream->transmit_buf, 0, TRANSMIT_BUFLEN);
+
+	return;
+}
+
+
 utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 					  struct aes_data *aes_data)
 {
@@ -385,10 +403,6 @@ utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 
 	FUNC_ENTER;
 
-	lt_set_level(LT_AUDIO_STREAM, LT_INFO);
-
-	DEBG("Starting to send audio stream\n");
-
 	ret = initialize_aes(aes_data);
 	if (UTILITY_SUCCESS != ret) {
 		ERRR("Failed to initialize AES data\n");
@@ -396,6 +410,8 @@ utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 	}
 
 	do {
+		clear_audio_buffers(audio_stream);
+
 		ret = read_audio_data(audio_stream);
 		if (UTILITY_SUCCESS != ret) {
 			ERRR("Failed to read audio data\n");
@@ -445,5 +461,8 @@ utility_retcode_t send_audio_stream(struct audio_stream *audio_stream,
 				    struct aes_data *aes_data)
 {
 	open_audio_dump_files();
+
+	INFO("Starting to send audio stream\n");
+
 	return send_audio_stream_internal(audio_stream, aes_data);
 }
