@@ -29,5 +29,6 @@ utility_retcode_t dump_converted(uint8_t *buf, size_t size);
 utility_retcode_t dump_encrypted(uint8_t *buf, size_t size);
 utility_retcode_t dump_complete_raopd(uint8_t *buf, size_t size);
 utility_retcode_t dump_complete_raop_play(uint8_t *buf, size_t size);
+void test_audio(void);
 
 #endif /* #ifndef AUDIO_DEBUG_H */

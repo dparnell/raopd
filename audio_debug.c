@@ -23,7 +23,9 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include "utility.h"
 #include "lt.h"
+#include "encryption.h"
 #include "audio_debug.h"
+#include "audio_stream.h"
 
 #define DEFAULT_FACILITY LT_AUDIO_DEBUG
 
@@ -68,11 +70,13 @@ static int open_one_dumpfile(const char *name)
 	char dumpfile[64];
 	int fd, pid;
 
+	INFO("Opening audio dumpfiles\n");
+
 	pid = syscalls_getpid();
 
 	snprintf(dumpfile,
 		 sizeof(dumpfile),
-		 "./audio_debug/%s.%d", name, pid);
+		 "./audio_debug/%s.%s.%d", name, CODE_VERSION, pid);
 
 	fd = open(dumpfile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 
@@ -218,4 +222,39 @@ utility_retcode_t dump_complete_raop_play(uint8_t *buf, size_t size)
 
 	FUNC_RETURN;
 	return ret;
+}
+
+
+void test_audio(void)
+{
+	struct aes_data aes_data;
+	struct audio_stream audio_stream;
+	char pcm_testdata[] = "pcm_testfile";
+
+	CRIT("Testing audio send routines; no connections "
+	     "will be made to the server\n");
+
+	lt_set_level(LT_AUDIO_STREAM, LT_INFO);
+	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_INFO);
+
+	generate_aes_data(&aes_data);
+
+	syscalls_strncpy(audio_stream.pcm_data_file,
+			 pcm_testdata,
+			 sizeof(audio_stream.pcm_data_file));
+
+	audio_stream.session_fd = syscalls_open("./fake_session",
+						O_RDWR, S_IRUSR | S_IWUSR);
+
+	if (-1 == audio_stream.session_fd) {
+		ERRR("Failed to open fake session file descriptor\n");
+		goto out;
+	}
+
+	init_audio_stream(&audio_stream);
+	send_audio_stream(&audio_stream, &aes_data);
+
+out:
+	CRIT("Audio test done; exiting\n");
+	exit (1);
 }

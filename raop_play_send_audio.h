@@ -18,6 +18,9 @@ You should have received a copy of the GNU General Public License
 along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef RAOP_PLAY_SEND_AUDIO_H
+#define RAOP_PLAY_SEND_AUDIO_H
+
 #include <signal.h>
 #include <samplerate.h>
 
@@ -159,4 +162,5 @@ typedef struct raopld_t{
 }raopld_t;
 
 int hacked_send_audio(char *pcm_audio_file, int session_fd, struct aes_data *aes_data);
-void test_audio(void);
+
+#endif /* #ifndef RAOP_PLAY_SEND_AUDIO_H */
