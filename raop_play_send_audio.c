@@ -361,7 +361,7 @@ static int fd_event_callback(void *p, int flags)
 	DEBG("flags: 0x%x\n", flags);
 
 	if (flags & RAOP_FD_READ) {
-		INFO("Preparing to read from session fd\n");
+		INFO("Preparing to read from session fd (%d)\n", raopcld->sfd);
 
 		i = syscalls_read(raopcld->sfd, buf, sizeof(buf));
 

@@ -32,6 +32,8 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 #define AUDIO_WRITE_RETRIES 10
 #define SERVER_READ_RETRIES 10
 
+#define SERVER_POLL_TIMEOUT 3000 /* miliseconds */
+
 struct transmit_buffer {
 	uint8_t header[16];
 	uint8_t data[];
@@ -41,6 +43,8 @@ struct audio_stream {
 	char pcm_data_file[MAX_FILE_NAME_LEN];
 	int pcm_fd;
 	int session_fd;
+	int server_ready_for_reading;
+	int server_ready_for_writing;
 
 	uint8_t *pcm_buf;
 	size_t pcm_bufsize;
@@ -60,7 +64,8 @@ struct audio_stream {
 	size_t transmit_bufsize;
 	size_t transmit_len;
 
-	size_t bytes_transmitted;
+	size_t written;
+	size_t total_bytes_transmitted;
 };
 
 //#define USE_RAOP_PLAY_CODE

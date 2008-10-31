@@ -16,6 +16,8 @@ for more details.
 You should have received a copy of the GNU General Public License
 along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 */
+#include <poll.h>
+
 #include "syscalls.h"
 #include "config.h"
 #include "utility.h"
@@ -29,7 +31,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 utility_retcode_t init_audio_stream(struct audio_stream *audio_stream)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
-	long arg;
 
 	FUNC_ENTER;
 
@@ -46,21 +47,6 @@ utility_retcode_t init_audio_stream(struct audio_stream *audio_stream)
 	}
 
 	audio_stream->pcm_data_available = 1;
-
-	/* XXX need fcntl added to syscalls.c */
-	if ((arg = fcntl(audio_stream->session_fd, F_GETFL, NULL)) < 0) { 
-		ERRR("Error fcntl(..., F_GETFL) (%s)\n", strerror(errno));
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
-
-	arg |= O_NONBLOCK; 
-
-	if (fcntl(audio_stream->session_fd, F_SETFL, arg) < 0) { 
-		ERRR("Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
-		ret = UTILITY_FAILURE;
-		goto out;
-	}
 
 	audio_stream->pcm_buf = syscalls_malloc(PCM_BUFLEN);
 	if (NULL == audio_stream->pcm_buf) {
@@ -96,33 +82,63 @@ out:
 }
 
 
-static utility_retcode_t read_aex(int session_fd)
+static utility_retcode_t poll_server(struct audio_stream *audio_stream)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+	struct pollfd fd;
+	int poll_ret;
+
+	FUNC_ENTER;
+
+	fd.fd = audio_stream->session_fd;
+	fd.events |= POLLIN;
+	fd.events |= POLLOUT;
+
+	poll_ret = syscalls_poll(&fd, 1, SERVER_POLL_TIMEOUT);
+
+	if (-1 == poll_ret) {
+		ERRR("Error polling server: \"%s\"\n", strerror(errno)); 
+		ret = UTILITY_FAILURE;
+		goto out;
+	}
+
+	audio_stream->server_ready_for_reading = fd.revents & POLLIN;
+	audio_stream->server_ready_for_reading = fd.revents & POLLOUT;
+
+	DEBG("server_ready_for_reading: %d\n",
+	     audio_stream->server_ready_for_reading);
+	DEBG("server_ready_for_writing: %d\n",
+	     audio_stream->server_ready_for_writing);
+
+out:
+	FUNC_RETURN;
+	return ret;
+}
+
+
+static utility_retcode_t read_server(int session_fd)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
 	uint8_t buf[256];
-	uint32_t *aex_data;
+	uint32_t *size_data;
 	int rsize, read_ret;
 
 	FUNC_ENTER;
 
-	INFO("Preparing to read from session fd\n");
+	INFO("Preparing to read from session fd (%d)\n", session_fd);
 
 	read_ret = syscalls_read(session_fd, buf, sizeof(buf));
 
 	if (0 < read_ret) {
-		INFO("Read %d bytes from AEX\n", ret);
-		aex_data = (uint32_t *)(buf + 0x2c);
-		rsize = syscalls_ntohl(*aex_data);
-		INFO("Size in AEX: %d\n", rsize);
+		INFO("Read %d bytes from server\n", ret);
+		size_data = (uint32_t *)(buf + 0x2c);
+		rsize = syscalls_ntohl(*size_data);
+		INFO("Size in server: %d\n", rsize);
 	}
 
 	if (0 > read_ret) {
-		if (EAGAIN == errno) {
-			DEBG("Got EAGAIN from read\n");
-		} else {
-			INFO("Failure reading from server: %s\n", strerror(errno));
-			ret = UTILITY_FAILURE;
-		}
+		ERRR("Failure reading from server: %s\n", strerror(errno));
+		ret = UTILITY_FAILURE;
 	}
 
 	if (0 == read_ret) {
@@ -262,59 +278,92 @@ static utility_retcode_t encrypt_audio_data(struct audio_stream *audio_stream,
 }
 
 
-static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
+static utility_retcode_t write_data(struct audio_stream *audio_stream)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
-	int retries = 0, write_ret;
-	size_t written = 0;
+	int write_ret;
 
-	dump_complete_raopd(audio_stream->transmit_buf + written,
-			    audio_stream->transmit_len - written);
+	FUNC_ENTER;
 
-	while (written <  audio_stream->transmit_len &&
+	DEBG("Attempting to write %d bytes to server "
+	     "(written: %d audio_stream->transmit_len: %d)\n",
+	     audio_stream->transmit_len - audio_stream->written,
+	     audio_stream->written, audio_stream->transmit_len);
+
+	write_ret = syscalls_write(audio_stream->session_fd,
+				   audio_stream->transmit_buf +
+				   audio_stream->written,
+				   audio_stream->transmit_len -
+				   audio_stream->written);
+
+	if (write_ret > 0) {
+
+		dump_complete_raopd(audio_stream->transmit_buf + 
+				    audio_stream->written,
+				    write_ret);
+
+		audio_stream->total_bytes_transmitted += write_ret;
+		audio_stream->written += write_ret;
+		INFO("Wrote %d bytes (written this chunk: %d "
+		     "total written: %d)\n",
+		     write_ret, audio_stream->written,
+		     audio_stream->total_bytes_transmitted);
+
+	}
+
+	if (0 == write_ret) {
+		INFO("Server closed connection\n");
+		ret = UTILITY_FAILURE;
+	}
+
+	if (write_ret < 0) {
+		ERRR("Failed to write audio data to server: \"%s\"\n",
+		     strerror(errno));
+		ret = UTILITY_FAILURE;
+	}
+
+	FUNC_RETURN;
+	return ret;
+}
+
+
+static utility_retcode_t poll_server_and_write_data(struct audio_stream *audio_stream)
+{
+	utility_retcode_t ret = UTILITY_SUCCESS;
+	int retries = 0;
+
+	while (audio_stream->written < audio_stream->transmit_len &&
 	       retries < AUDIO_WRITE_RETRIES) {
 
-		DEBG("Attempting to write %d bytes to server "
-		     "(written: %d audio_stream->transmit_len: %d)\n",
-		     audio_stream->transmit_len - written,
-		     written, audio_stream->transmit_len);
+		poll_server(audio_stream);
 
-		write_ret = syscalls_write(audio_stream->session_fd,
-					   audio_stream->transmit_buf + written,
-					   audio_stream->transmit_len - written);
+		if (0 != audio_stream->server_ready_for_reading) {
 
-		if (write_ret > 0) {
+			ret = read_server(audio_stream->session_fd);
 
-			audio_stream->bytes_transmitted += write_ret;
-			written += write_ret;
-			DEBG("Wrote %d bytes (written this chunk: %d "
-			     "total written: %d)\n",
-			     write_ret, written, audio_stream->bytes_transmitted);
-		}
-
-		if (0 == write_ret) {
-			INFO("Server closed connection\n");
-			break;
-		}
-
-		if (write_ret < 0) {
-			if (EAGAIN == errno) {
-				INFO("Got EAGAIN from write\n");
-				syscalls_usleep(100000);
-			} else {
-				ERRR("Failed to write audio data to server\n");
-				ret = UTILITY_FAILURE;
+			if (UTILITY_SUCCESS != ret) {
 				break;
 			}
+
+			audio_stream->server_ready_for_reading = 0;
+		}
+
+		if (0 != audio_stream->server_ready_for_writing) {
+
+			ret = write_data(audio_stream);
+
+			if (UTILITY_SUCCESS != ret) {
+				break;
+			}
+
+			audio_stream->server_ready_for_reading = 0;
 		}
 
 		retries++;
-
-		read_aex(audio_stream->session_fd);
 	}
 
 	DEBG("written: %d audio_stream->transmit_len: %d\n",
-	     written, audio_stream->transmit_len);
+	     audio_stream->written, audio_stream->transmit_len);
 
 	if (retries == AUDIO_WRITE_RETRIES) {
 		ret = UTILITY_FAILURE;
@@ -324,7 +373,7 @@ static utility_retcode_t write_data_to_socket(struct audio_stream *audio_stream)
 }
 
 
-static utility_retcode_t send_audio_data(struct audio_stream *audio_stream)
+static utility_retcode_t prepare_transmit_buf(struct audio_stream *audio_stream)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
 	int reported_len;
@@ -367,8 +416,6 @@ static utility_retcode_t send_audio_data(struct audio_stream *audio_stream)
 	transmit_buf->header[2] = reported_len >> 8;
 	transmit_buf->header[3] = reported_len & 0xff;
 
-	write_data_to_socket(audio_stream);
-
 	return ret;
 }
 
@@ -384,12 +431,21 @@ utility_retcode_t raop_play_send_audio_stream(struct audio_stream *audio_stream,
 }
 
 
-static void clear_audio_buffers(struct audio_stream *audio_stream)
+static void begin_audio_chunk(struct audio_stream *audio_stream)
 {
 	syscalls_memset(audio_stream->pcm_buf, 0, PCM_BUFLEN);
 	syscalls_memset(audio_stream->converted_buf, 0, CONVERTED_BUFLEN);
 	syscalls_memset(audio_stream->encrypted_buf, 0, ENCRYPTED_BUFLEN);
 	syscalls_memset(audio_stream->transmit_buf, 0, TRANSMIT_BUFLEN);
+
+	audio_stream->server_ready_for_reading = 0;
+	audio_stream->server_ready_for_writing = 0;
+	audio_stream->pcm_len = 0;
+	audio_stream->pcm_num_samples_read = 0;
+	audio_stream->converted_len = 0;
+	audio_stream->encrypted_len = 0;
+	audio_stream->transmit_len = 0;
+	audio_stream->written = 0;
 
 	return;
 }
@@ -410,7 +466,7 @@ utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 	}
 
 	do {
-		clear_audio_buffers(audio_stream);
+		begin_audio_chunk(audio_stream);
 
 		ret = read_audio_data(audio_stream);
 		if (UTILITY_SUCCESS != ret) {
@@ -432,17 +488,18 @@ utility_retcode_t raopd_send_audio_stream(struct audio_stream *audio_stream,
 				goto out;
 			}
 
-			ret = send_audio_data(audio_stream);
+			prepare_transmit_buf(audio_stream);
+
+			ret = poll_server_and_write_data(audio_stream);
 			if (UTILITY_SUCCESS != ret) {
-				ERRR("Failed to send audio data\n");
+				ERRR("Session ended\n");
 				goto out;
 			}
 		}
 
-	} while (UTILITY_SUCCESS == read_aex(audio_stream->session_fd) &&
-		 audio_stream->pcm_data_available);
+	} while (audio_stream->pcm_data_available);
 
-	while (UTILITY_SUCCESS == read_aex(audio_stream->session_fd) &&
+	while (UTILITY_SUCCESS == read_server(audio_stream->session_fd) &&
 		retries < SERVER_READ_RETRIES) {
 
 		INFO("Waiting for server to close the connection\n");
@@ -460,6 +517,9 @@ out:
 utility_retcode_t send_audio_stream(struct audio_stream *audio_stream,
 				    struct aes_data *aes_data)
 {
+	lt_set_level(LT_AUDIO_STREAM, LT_INFO);
+	lt_set_level(LT_RAOP_PLAY_SEND_AUDIO, LT_INFO);
+
 	open_audio_dump_files();
 
 	INFO("Starting to send audio stream\n");
