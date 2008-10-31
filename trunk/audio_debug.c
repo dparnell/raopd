@@ -244,7 +244,8 @@ void test_audio(void)
 			 sizeof(audio_stream.pcm_data_file));
 
 	audio_stream.session_fd = syscalls_open("./fake_session",
-						O_RDWR, S_IRUSR | S_IWUSR);
+						O_RDWR | O_CREAT | O_TRUNC,
+						S_IRUSR | S_IWUSR);
 
 	if (-1 == audio_stream.session_fd) {
 		ERRR("Failed to open fake session file descriptor\n");

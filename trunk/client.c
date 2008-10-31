@@ -93,11 +93,11 @@ utility_retcode_t read_response(struct rtsp_response *response)
 	DEBG("before read from fd %d\n", session->control_fd);
 
 	/* XXX This read call is not correct--it needs to have a
-	   timeout and it assumes that all the data is going to come
+	   timeout, and it assumes that all the data is going to come
 	   back in one read.  These problems need to be fixed,
-	   although it turns out that the AEX seems always to return
-	   all its data for each response in one shot, so this code
-	   will work for now.
+	   although it turns out that all the data for each response
+	   seems to come back in one shot, so this code will work for
+	   now.
 
 	   Reading the response is trivially more challenging than it
 	   appears because the network client code needs to understand

@@ -101,4 +101,7 @@ int syscalls_pthread_join(pthread_t thread, void **value_ptr);
 #define syscalls_abort abort
 #define syscalls_gettimeofday gettimeofday
 
+/* XXX needs error checking */
+#define syscalls_poll poll
+
 #endif /* #ifndef SYSCALLS_H */
