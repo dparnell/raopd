@@ -401,14 +401,17 @@ static int fd_event_callback(void *p, int flags)
 		return -1;
 	}
 
-	INFO("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
+	DEBG("Writing %d bytes to fd %d\n", raopcld->wblk_remsize, raopcld->sfd);
+
 	i = syscalls_write(raopcld->sfd,
 			   raopcld->data + raopcld->wblk_wsize,
 			   raopcld->wblk_remsize);
 
+	INFO("Wrote %d bytes to server\n", i);
+
 	dump_complete_raop_play(raopcld->data + raopcld->wblk_wsize, i);
 
-	INFO("write to %d returned %d\n", raopcld->sfd, i);
+	DEBG("write to %d returned %d\n", raopcld->sfd, i);
 
 	if (i < 0) {
 		ERRR("%s: write error: %s\n", __func__, strerror(errno));
@@ -425,7 +428,7 @@ static int fd_event_callback(void *p, int flags)
 		set_fd_event(raopcld->sfd, RAOP_FD_READ, fd_event_callback,(void*)raopcld);
 	}
 
-	INFO("%d bytes are sent, remaining size %d\n", i, raopcld->wblk_remsize);
+	DEBG("%d bytes are sent, remaining size %d\n", i, raopcld->wblk_remsize);
 	return 0;
 }
 
@@ -545,7 +548,7 @@ static int raopcl_aexbuf_time(raopcl_t *p, struct timeval *dtv)
 	raopcl_data_t *raopcld=(raopcl_data_t *)p;
 	struct timeval ctv, atv;
 
-	INFO("in aexbuf time\n");
+	DEBG("in aexbuf time\n");
 
 	if (!p) return -1;
 
@@ -576,7 +579,7 @@ static int raopcl_aexbuf_time(raopcl_t *p, struct timeval *dtv)
 		memset(dtv, 0, sizeof(struct timeval));
 	}
 
-	INFO("%s:tv_sec=%d, tv_usec=%d\n",__func__,(int)dtv->tv_sec,(int)dtv->tv_usec);
+	DEBG("%s:tv_sec=%d, tv_usec=%d\n",__func__,(int)dtv->tv_sec,(int)dtv->tv_usec);
 
 	return 0;
 }
@@ -586,7 +589,7 @@ static int main_event_handler()
 {
 	fd_set rdfds,wrfds;
 	int fdmax=0;
-	int i;
+	int i, select_ret;
 	struct timeval tout={.tv_sec=MAIN_EVENT_TIMEOUT, .tv_usec=0};
 
 	DEBG("in main event handler\n");
@@ -616,7 +619,8 @@ static int main_event_handler()
 		raopcl_aexbuf_time(raopld->raopcl, &tout);
 	}
 
-	select(fdmax + 1, &rdfds, &wrfds, NULL, &tout);
+	select_ret = select(fdmax + 1, &rdfds, &wrfds, NULL, &tout);
+	INFO("%d events occurred\n", select_ret);
 
 	for(i=0;i<MAX_NUM_OF_FDS;i++){
 		if (raopld->fds[i].fd < 0) {
@@ -626,6 +630,7 @@ static int main_event_handler()
 		if ((raopld->fds[i].flags & RAOP_FD_READ) &&
 		    FD_ISSET(raopld->fds[i].fd, &rdfds)) {
 			DEBG("rd event i=%d, flags=%d\n",i,raopld->fds[i].flags);
+			INFO("Server is ready for reading\n");
 			if (raopld->fds[i].cbf &&
 			    raopld->fds[i].cbf(raopld->fds[i].dp, RAOP_FD_READ)) {
 				return -1;
@@ -635,6 +640,7 @@ static int main_event_handler()
 		if((raopld->fds[i].flags&RAOP_FD_WRITE) &&
 		   FD_ISSET(raopld->fds[i].fd,&wrfds)){
 			DEBG("wr event i=%d, flags=%d\n",i,raopld->fds[i].flags);
+			INFO("Server is ready for writing\n");
 			if(raopld->fds[i].cbf &&
 			   raopld->fds[i].cbf(raopld->fds[i].dp, RAOP_FD_WRITE)) return -1;
 		}
@@ -644,7 +650,7 @@ static int main_event_handler()
 		raopcl_aexbuf_time(raopld->raopcl, &tout);
 		if(!tout.tv_sec && !tout.tv_usec){
 			// AEX data buffer becomes empty, it means end of playing a song.
-			INFO("%s\n",RAOP_SONGDONE);
+			DEBG("%s\n",RAOP_SONGDONE);
 			fflush(stdout);
 			raopcl_wait_songdone(raopld->raopcl,-1); // clear wait_songdone
 		}
