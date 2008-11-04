@@ -85,30 +85,41 @@ out:
 static utility_retcode_t poll_server(struct audio_stream *audio_stream)
 {
 	utility_retcode_t ret = UTILITY_SUCCESS;
-	struct pollfd fd;
-	int poll_ret;
+	fd_set read_fds, write_fds, except_fds;
+	int select_ret;
 
 	FUNC_ENTER;
 
-	fd.fd = audio_stream->session_fd;
-	fd.events |= POLLIN;
-	fd.events |= POLLOUT;
+	FD_ZERO(&read_fds);
+	FD_ZERO(&write_fds);
+	FD_ZERO(&except_fds);
 
-	poll_ret = syscalls_poll(&fd, 1, SERVER_POLL_TIMEOUT);
+	FD_SET(audio_stream->session_fd, &read_fds);
+	FD_SET(audio_stream->session_fd, &write_fds);
 
-	if (-1 == poll_ret) {
-		ERRR("Error polling server: \"%s\"\n", strerror(errno)); 
+	select_ret = select(audio_stream->session_fd + 1,
+			    &read_fds,
+			    &write_fds,
+			    &except_fds, NULL);
+
+	if (-1 == select_ret) {
+		ERRR("Select on session file descriptor failed: \"%s\"\n",
+		     strerror(errno));
 		ret = UTILITY_FAILURE;
 		goto out;
 	}
 
-	audio_stream->server_ready_for_reading = fd.revents & POLLIN;
-	audio_stream->server_ready_for_reading = fd.revents & POLLOUT;
+	INFO("%d events occurred\n", select_ret);
 
-	DEBG("server_ready_for_reading: %d\n",
-	     audio_stream->server_ready_for_reading);
-	DEBG("server_ready_for_writing: %d\n",
-	     audio_stream->server_ready_for_writing);
+	if (FD_ISSET(audio_stream->session_fd, &read_fds)) {
+		INFO("Server is ready for reading\n");
+		audio_stream->server_ready_for_reading = 1;
+	}
+
+	if (FD_ISSET(audio_stream->session_fd, &write_fds)) {
+		INFO("Server is ready for writing\n");
+		audio_stream->server_ready_for_writing = 1;
+	}
 
 out:
 	FUNC_RETURN;
@@ -263,6 +274,8 @@ static utility_retcode_t encrypt_audio_data(struct audio_stream *audio_stream,
 	INFO("Attempting to encrypt %d bytes of audio data\n",
 	     audio_stream->converted_len);
 
+	initialize_aes(aes_data);
+
 	aes_encrypt_data(aes_data,
 			 audio_stream->encrypted_buf,
 			 &audio_stream->encrypted_len,
@@ -298,15 +311,17 @@ static utility_retcode_t write_data(struct audio_stream *audio_stream)
 
 	if (write_ret > 0) {
 
+		INFO("Wrote %d bytes to server\n", write_ret);
+
 		dump_complete_raopd(audio_stream->transmit_buf + 
 				    audio_stream->written,
 				    write_ret);
 
 		audio_stream->total_bytes_transmitted += write_ret;
 		audio_stream->written += write_ret;
-		INFO("Wrote %d bytes (written this chunk: %d "
-		     "total written: %d)\n",
-		     write_ret, audio_stream->written,
+
+		DEBG("written this chunk: %d total written: %d\n",
+		     audio_stream->written,
 		     audio_stream->total_bytes_transmitted);
 
 	}

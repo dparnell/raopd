@@ -35,7 +35,7 @@ int main(void)
 	lt_init();
 	FUNC_ENTER;
 
-	test_audio();
+	//test_audio();
 
 	NOTC("raopd starting\n");
 
