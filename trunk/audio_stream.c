@@ -186,7 +186,7 @@ static utility_retcode_t read_audio_data(struct audio_stream *audio_stream)
 
 	INFO("Read %d bytes of PCM data\n", (int)audio_stream->pcm_len);
 
-	dump_raw_pcm(audio_stream->pcm_buf, audio_stream->pcm_len);
+	/* dump_raw_pcm(audio_stream->pcm_buf, audio_stream->pcm_len); */
 
 	if (0 == read_ret) {
 		INFO("Finished reading PCM data\n");
@@ -257,12 +257,16 @@ utility_retcode_t raopd_convert_audio_data(struct audio_stream *audio_stream)
 		writep++;
 	}
 
-	audio_stream->converted_len = audio_stream->pcm_len + 3;
+	/* The additional 64 bytes in the length are to remove
+	 * clicking/popping in the right channel.  If anyone can
+	 * provide an explanation of why this is necessary, I would
+	 * love to know.  */
+	audio_stream->converted_len = audio_stream->pcm_len + 3 + 64;
 
 	INFO("Converted PCM data is %d bytes\n", audio_stream->converted_len);
 
-	dump_converted(audio_stream->converted_buf,
-		       audio_stream->converted_len);
+	/* dump_converted(audio_stream->converted_buf,
+	   audio_stream->converted_len); */
 
 	return UTILITY_SUCCESS;
 }

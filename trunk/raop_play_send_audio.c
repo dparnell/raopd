@@ -178,7 +178,7 @@ static int auds_write_pcm(uint8_t *buffer, uint8_t **data, int *size,
 		*size += 1;
 	}
 
-	dump_converted(buffer, *size);
+	/* dump_converted(buffer, *size); */
 
 	INFO("Converted PCM data is %d bytes\n", *size);
 
@@ -292,7 +292,7 @@ static int pcm_get_next_sample(auds_t *auds, uint8_t **data, int *size)
 
 	INFO("Read %d bytes of PCM data\n", (int)bytes_read);
 
-	dump_raw_pcm(rbuf, bytes_read);
+	/* dump_raw_pcm(rbuf, bytes_read); */
 
 	if (ds.u.mem.size < MINIMUM_SAMPLE_SIZE * 4) {
 		ds.u.mem.size = MINIMUM_SAMPLE_SIZE * 4;
@@ -494,7 +494,7 @@ static int raopcl_send_sample(raopcl_t *p, uint8_t *sample, int count)
 
 	free(encrypted_buffer);
 
-	dump_encrypted(raopcld->data + header_size, count);
+	dump_encrypted(raopcld->data + header_size, encrypted_len);//count);
 
 	len = count + header_size - 4;
 	INFO("Reported length: %d\n", len);
