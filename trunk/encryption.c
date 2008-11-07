@@ -39,11 +39,6 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 utility_retcode_t generate_aes_iv(struct aes_data *aes_data)
 {
 	utility_retcode_t ret;
-	uint8_t iv[] = { 0x1, 0x2, 0x3, 0x4, 
-			 0x1, 0x2, 0x3, 0x4, 
-			 0x1, 0x2, 0x3, 0x4, 
-			 0x1, 0x2, 0x3, 0x4 };
-
 
 	FUNC_ENTER;
 
@@ -51,7 +46,6 @@ utility_retcode_t generate_aes_iv(struct aes_data *aes_data)
 
 	ret = get_random_bytes((uint8_t *)&aes_data->iv, sizeof(aes_data->iv));
 
-	memcpy(&aes_data->iv, iv, sizeof(iv));
 	ret = UTILITY_SUCCESS;
 
 	FUNC_RETURN;
@@ -62,10 +56,6 @@ utility_retcode_t generate_aes_iv(struct aes_data *aes_data)
 utility_retcode_t generate_aes_key(struct aes_data *aes_data)
 {
 	utility_retcode_t ret;
-	uint8_t key[] = { 0x5, 0x6, 0x7, 0x8, 
-			  0x5, 0x6, 0x7, 0x8, 
-			  0x5, 0x6, 0x7, 0x8, 
-			  0x5, 0x6, 0x7, 0x8 };
 
 	FUNC_ENTER;
 
@@ -73,7 +63,6 @@ utility_retcode_t generate_aes_key(struct aes_data *aes_data)
 
 	ret = get_random_bytes((uint8_t *)&aes_data->key, sizeof(aes_data->key));
 
-	memcpy(&aes_data->key, key, sizeof(key));
 	ret = UTILITY_SUCCESS;
 
 	FUNC_RETURN;
