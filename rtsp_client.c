@@ -256,7 +256,7 @@ static utility_retcode_t send_volume_request(struct rtsp_request *request)
 	request->msg_body_bytes_remaining -=
 		snprintf(request->msg_body,
 			 request->msg_body_bytes_remaining,
-			 "volume: 0.000000\r\n");
+			 "volume: -20.000000\r\n");
 
 	ret = create_content_length_header(request);
 	if (UTILITY_SUCCESS != ret) {

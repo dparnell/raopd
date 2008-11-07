@@ -1,3 +1,6 @@
+The permissions on the alsa devices are set by default to 600 with
+uid:gid root root.
+
 The conversion process is deterministic; I saw no reason that it
 should not be, but confirmed it by writing the output to a set of
 files and comparing them over several runs.
