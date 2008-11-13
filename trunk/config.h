@@ -38,8 +38,8 @@ along with raopd.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef HTTPD_TEST
 
-#define CLIENT_HOST "10.0.33.222"
-#define SERVER_HOST "10.0.33.1"
+#define CLIENT_HOST "10.0.1.167"
+#define SERVER_HOST "10.0.1.192"
 #define SERVER_PORT 5000
 
 #else /* #ifndef HTTPD_TEST */
