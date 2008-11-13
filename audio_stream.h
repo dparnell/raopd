@@ -65,7 +65,7 @@ struct audio_stream {
 	size_t transmit_len;
 
 	size_t written;
-	size_t total_bytes_transmitted;
+	unsigned long long total_bytes_transmitted;
 };
 
 //#define USE_RAOP_PLAY_CODE

@@ -324,7 +324,7 @@ static utility_retcode_t write_data(struct audio_stream *audio_stream)
 		audio_stream->total_bytes_transmitted += write_ret;
 		audio_stream->written += write_ret;
 
-		DEBG("written this chunk: %d total written: %d\n",
+		DEBG("written this chunk: %d total written: %llu\n",
 		     audio_stream->written,
 		     audio_stream->total_bytes_transmitted);
 
